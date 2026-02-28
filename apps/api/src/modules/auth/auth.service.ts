@@ -1,4 +1,4 @@
-import { hash, compare } from "bcrypt";
+import bcrypt from "bcryptjs";
 import { prisma } from "@leadvoice/database";
 import { AppError, UnauthorizedError } from "../../utils/errors.js";
 import type { RegisterInput, LoginInput } from "./auth.schema.js";
@@ -11,7 +11,7 @@ export async function registerUser(input: RegisterInput) {
     throw new AppError(409, "Email already registered");
   }
 
-  const passwordHash = await hash(input.password, SALT_ROUNDS);
+  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
 
   const user = await prisma.user.create({
     data: {
@@ -31,7 +31,7 @@ export async function loginUser(input: LoginInput) {
     throw new UnauthorizedError("Invalid credentials");
   }
 
-  const valid = await compare(input.password, user.password);
+  const valid = await bcrypt.compare(input.password, user.password);
   if (!valid) {
     throw new UnauthorizedError("Invalid credentials");
   }
