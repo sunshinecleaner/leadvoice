@@ -62,6 +62,7 @@ export async function buildApp() {
     return reply.status(500).send({
       success: false,
       error: "Internal server error",
+      debug: error.message,
     });
   });
 
