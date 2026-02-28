@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  AGENT
+}
+
+enum LeadSource {
+  CSV
+  API
+  CRM
+  LANDING_PAGE
+  MANUAL
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum CampaignLeadStatus {
+  PENDING
+  CALLING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NO_ANSWER
+  BUSY
+  TRANSFERRED
+}
+
+enum CallDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum CallOutcome {
+  INTERESTED
+  NOT_INTERESTED
+  CALLBACK
+  TRANSFERRED
+  VOICEMAIL
+  ERROR
+}
+
+enum IntegrationType {
+  HUBSPOT
+  SALESFORCE
+  WEBHOOK
+  ZAPIER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(AGENT)
+  avatar    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedLeads    Lead[]
+  createdCampaigns Campaign[]
+  handledCalls     Call[]     @relation("AgentCalls")
+
+  @@map("users")
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  firstName String
+  lastName  String
+  phone     String
+  email     String?
+  company   String?
+  source    LeadSource @default(MANUAL)
+  status    LeadStatus @default(NEW)
+  score     Int        @default(0)
+  timezone  String?
+  tags      String[]   @default([])
+  notes     String?
+  metadata  Json?
+
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignLeads CampaignLead[]
+  calls         Call[]
+
+  @@index([status])
+  @@index([source])
+  @@index([phone])
+  @@index([email])
+  @@map("leads")
+}
+
+model Campaign {
+  id                 String         @id @default(cuid())
+  name               String
+  description        String?
+  status             CampaignStatus @default(DRAFT)
+  script             String         @db.Text
+  voiceId            String?
+  maxRetries         Int            @default(3)
+  retryDelayMinutes  Int            @default(60)
+  callingWindowStart String         @default("09:00")
+  callingWindowEnd   String         @default("17:00")
+  timezone           String         @default("America/New_York")
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaignLeads CampaignLead[]
+
+  @@map("campaigns")
+}
+
+model CampaignLead {
+  id            String             @id @default(cuid())
+  campaignId    String
+  campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leadId        String
+  lead          Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status        CampaignLeadStatus @default(PENDING)
+  attempts      Int                @default(0)
+  lastAttemptAt DateTime?
+  scheduledAt   DateTime?
+
+  calls Call[]
+
+  @@unique([campaignId, leadId])
+  @@index([status])
+  @@map("campaign_leads")
+}
+
+model Call {
+  id              String       @id @default(cuid())
+  campaignLeadId  String?
+  campaignLead    CampaignLead? @relation(fields: [campaignLeadId], references: [id], onDelete: SetNull)
+  leadId          String
+  lead            Lead         @relation(fields: [leadId], references: [id])
+  twilioCallSid   String?      @unique
+  status          CallStatus   @default(INITIATED)
+  direction       CallDirection @default(OUTBOUND)
+  duration        Int?
+  recordingUrl    String?
+  transcription   String?      @db.Text
+  outcome         CallOutcome?
+  agentId         String?
+  agent           User?        @relation("AgentCalls", fields: [agentId], references: [id], onDelete: SetNull)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime     @default(now())
+
+  events CallEvent[]
+
+  @@index([status])
+  @@index([leadId])
+  @@index([twilioCallSid])
+  @@map("calls")
+}
+
+model CallEvent {
+  id        String   @id @default(cuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  event     String
+  data      Json?
+  timestamp DateTime @default(now())
+
+  @@index([callId])
+  @@map("call_events")
+}
+
+model Integration {
+  id        String          @id @default(cuid())
+  type      IntegrationType
+  name      String
+  config    Json
+  active    Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@map("integrations")
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  type  String @default("string")
+
+  @@map("settings")
+}
