@@ -11,7 +11,7 @@ async function main() {
     update: {},
     create: {
       email: "admin@leadvoice.com",
-      name: "Admin",
+      name: "Welica Nunes",
       password: passwordHash,
       role: UserRole.ADMIN,
     },
