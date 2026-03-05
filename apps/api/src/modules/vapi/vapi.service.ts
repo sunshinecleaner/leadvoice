@@ -1,8 +1,14 @@
-import { prisma, CallStatus, CallDirection } from "@leadvoice/database";
+import { prisma, CallStatus, CallDirection, LeadStatus } from "@leadvoice/database";
 import * as vapiClient from "./vapi.client.js";
 import { logger } from "../../lib/logger.js";
+import { env } from "../../config/env.js";
 
-// Initiate an outbound call to a lead via VAPI
+// Note: new enum values (CrmStage, ServiceType, etc.) use string literals
+// because the local Prisma client hasn't been regenerated yet.
+// After `prisma generate` runs on the server these will resolve correctly.
+
+// ─── Initiate outbound call ───────────────────────────────────────────────────
+
 export async function initiateCall(params: {
   leadId: string;
   campaignLeadId?: string;
@@ -11,7 +17,6 @@ export async function initiateCall(params: {
 }) {
   const lead = await prisma.lead.findUniqueOrThrow({ where: { id: params.leadId } });
 
-  // Create call record in DB
   const call = await prisma.call.create({
     data: {
       leadId: params.leadId,
@@ -22,7 +27,6 @@ export async function initiateCall(params: {
   });
 
   try {
-    // Trigger VAPI call
     const vapiCall = await vapiClient.createCall({
       phoneNumber: lead.phone,
       assistantId: params.assistantId,
@@ -37,16 +41,14 @@ export async function initiateCall(params: {
       },
     });
 
-    // Update call with VAPI call ID
-    await prisma.call.update({
+    await (prisma.call.update as any)({
       where: { id: call.id },
       data: {
-        twilioCallSid: vapiCall.id, // reusing field for VAPI call ID
+        vapiCallId: vapiCall.id,
         status: CallStatus.RINGING,
       },
     });
 
-    // Log event
     await prisma.callEvent.create({
       data: {
         callId: call.id,
@@ -58,7 +60,6 @@ export async function initiateCall(params: {
     logger.info({ callId: call.id, vapiCallId: vapiCall.id }, "VAPI call initiated");
     return { call, vapiCall };
   } catch (error) {
-    // Mark call as failed
     await prisma.call.update({
       where: { id: call.id },
       data: { status: CallStatus.FAILED },
@@ -67,33 +68,90 @@ export async function initiateCall(params: {
   }
 }
 
-// Process VAPI webhook when call ends
-export async function processCallCompleted(vapiCallId: string, vapiData: vapiClient.VapiCall) {
-  const call = await prisma.call.findFirst({
-    where: { twilioCallSid: vapiCallId },
+// ─── Handle inbound call started ─────────────────────────────────────────────
+
+export async function processInboundCallStarted(vapiCallId: string, callerPhone: string) {
+  let lead = await prisma.lead.findFirst({
+    where: { phone: callerPhone },
+    orderBy: { createdAt: "desc" },
   });
+
+  if (!lead) {
+    lead = await (prisma.lead.create as any)({
+      data: {
+        firstName: "Unknown",
+        lastName: "",
+        phone: callerPhone,
+        source: "INBOUND_CALL",
+        status: LeadStatus.NEW,
+        crmStage: "LEAD_NEW",
+        tags: ["lead-new", "inbound"],
+      },
+    });
+    logger.info({ leadId: lead!.id, phone: callerPhone }, "New inbound lead created");
+  }
+
+  const call = await (prisma.call.create as any)({
+    data: {
+      leadId: lead!.id,
+      vapiCallId,
+      status: CallStatus.IN_PROGRESS,
+      direction: CallDirection.INBOUND,
+      startedAt: new Date(),
+    },
+  });
+
+  await prisma.callEvent.create({
+    data: {
+      callId: call.id,
+      event: "vapi.call.started",
+      data: { vapiCallId, callerPhone },
+    },
+  });
+
+  return { call, lead: lead! };
+}
+
+// ─── Process completed call (end-of-call-report) ─────────────────────────────
+
+export async function processCallCompleted(
+  vapiCallId: string,
+  vapiData: vapiClient.VapiCall & { customerPhone?: string },
+) {
+  // Find call by vapiCallId first, fallback to twilioCallSid (legacy)
+  let call = await (prisma.call.findFirst as any)({ where: { vapiCallId } });
+  if (!call) {
+    call = await prisma.call.findFirst({ where: { twilioCallSid: vapiCallId } });
+  }
+
+  // For inbound calls that started without being tracked
+  if (!call && vapiData.customerPhone) {
+    const result = await processInboundCallStarted(vapiCallId, vapiData.customerPhone);
+    call = result.call;
+  }
 
   if (!call) {
     logger.warn({ vapiCallId }, "Received webhook for unknown call");
     return null;
   }
 
-  // Map VAPI result to our outcome
-  const outcome = mapVapiOutcome(vapiData.analysis?.successEvaluation);
+  const structured = (vapiData.analysis?.structuredData ?? {}) as Record<string, unknown>;
+  const outcome = mapVapiOutcome(vapiData.analysis?.successEvaluation, structured);
 
-  const updated = await prisma.call.update({
+  const updated = await (prisma.call.update as any)({
     where: { id: call.id },
     data: {
+      vapiCallId,
       status: CallStatus.COMPLETED,
       duration: Math.round(vapiData.duration || 0),
       recordingUrl: vapiData.recordingUrl,
       transcription: vapiData.transcript,
+      summary: vapiData.summary || vapiData.analysis?.summary,
       outcome,
       endedAt: new Date(),
     },
   });
 
-  // Log event
   await prisma.callEvent.create({
     data: {
       callId: call.id,
@@ -101,39 +159,147 @@ export async function processCallCompleted(vapiCallId: string, vapiData: vapiCli
       data: {
         duration: vapiData.duration,
         summary: vapiData.summary,
-        analysis: vapiData.analysis,
         cost: vapiData.cost,
+        analysis: vapiData.analysis as any,
       },
     },
   });
 
-  // Update campaign lead status if applicable
+  await updateLeadFromStructuredData(call.leadId, structured, outcome);
+
+  if (structured.serviceType) {
+    await createServiceRequest(call.leadId, structured);
+  }
+
   if (call.campaignLeadId) {
     await prisma.campaignLead.update({
       where: { id: call.campaignLeadId },
       data: {
-        status: outcome === "INTERESTED" || outcome === "TRANSFERRED" ? "COMPLETED" : "COMPLETED",
+        status: "COMPLETED",
         attempts: { increment: 1 },
         lastAttemptAt: new Date(),
       },
     });
   }
 
-  // Update lead status based on outcome
-  if (outcome === "INTERESTED") {
-    await prisma.lead.update({
-      where: { id: call.leadId },
-      data: { status: "QUALIFIED" },
-    });
-  }
+  await triggerN8N("call_completed", {
+    callId: call.id,
+    leadId: call.leadId,
+    vapiCallId,
+    outcome,
+    duration: vapiData.duration,
+    transcript: vapiData.transcript,
+    summary: vapiData.summary,
+    structuredData: structured,
+  });
 
   logger.info({ callId: call.id, outcome, duration: vapiData.duration }, "Call completed");
   return updated;
 }
 
-function mapVapiOutcome(evaluation?: string): "INTERESTED" | "NOT_INTERESTED" | "CALLBACK" | "TRANSFERRED" | "VOICEMAIL" | "ERROR" {
+// ─── Update lead from structured data ────────────────────────────────────────
+
+async function updateLeadFromStructuredData(
+  leadId: string,
+  data: Record<string, unknown>,
+  outcome: string,
+) {
+  const crmStage = mapOutcomeToCrmStage(outcome, data);
+
+  await (prisma.lead.update as any)({
+    where: { id: leadId },
+    data: {
+      ...(data.firstName ? { firstName: String(data.firstName) } : {}),
+      ...(data.lastName ? { lastName: String(data.lastName) } : {}),
+      ...(data.address ? { address: String(data.address) } : {}),
+      ...(data.city ? { city: String(data.city) } : {}),
+      ...(data.state ? { state: String(data.state) } : {}),
+      ...(data.zipCode ? { zipCode: String(data.zipCode) } : {}),
+      ...(data.propertyType ? { propertyType: mapPropertyType(String(data.propertyType)) } : {}),
+      ...(data.bedrooms ? { bedrooms: Number(data.bedrooms) } : {}),
+      ...(data.bathrooms ? { bathrooms: Number(data.bathrooms) } : {}),
+      ...(data.sqft ? { sqft: Number(data.sqft) } : {}),
+      ...(data.isOccupied !== undefined ? { isOccupied: Boolean(data.isOccupied) } : {}),
+      ...(data.conditionLevel ? { conditionLevel: mapConditionLevel(String(data.conditionLevel)) } : {}),
+      ...(data.preferredSchedule ? { preferredSchedule: String(data.preferredSchedule) } : {}),
+      ...(data.language ? { language: String(data.language).toUpperCase() === "ES" ? "ES" : "EN" } : {}),
+      status:
+        outcome === "INTERESTED" || outcome === "SCHEDULED"
+          ? LeadStatus.QUALIFIED
+          : outcome === "NOT_INTERESTED"
+          ? LeadStatus.LOST
+          : LeadStatus.CONTACTED,
+      crmStage,
+      tags: buildTags(outcome, data),
+    },
+  });
+}
+
+// ─── Create service request ───────────────────────────────────────────────────
+
+async function createServiceRequest(leadId: string, data: Record<string, unknown>) {
+  const serviceType = mapServiceType(String(data.serviceType));
+  if (!serviceType) return;
+
+  const isDeepCleaning = serviceType === "DEEP_CLEANING";
+
+  await (prisma as any).serviceRequest.create({
+    data: {
+      leadId,
+      serviceType,
+      frequency: mapFrequency(String(data.frequency || "one_time")),
+      addOns: Array.isArray(data.addOns) ? data.addOns.map(String) : [],
+      checklistSent: false,
+      depositRequired: isDeepCleaning,
+      depositAmount: isDeepCleaning ? 150 : null,
+      paymentStatus: "PENDING",
+      notes: data.notes ? String(data.notes) : null,
+    },
+  });
+}
+
+// ─── Trigger N8N ─────────────────────────────────────────────────────────────
+
+async function triggerN8N(event: string, data: Record<string, unknown>) {
+  if (!env.N8N_WEBHOOK_URL) return;
+
+  try {
+    await fetch(env.N8N_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, data, timestamp: new Date().toISOString() }),
+    });
+    logger.info({ event }, "N8N webhook triggered");
+  } catch (error) {
+    logger.error({ error, event }, "Failed to trigger N8N webhook");
+  }
+}
+
+// ─── Get VAPI assistants ──────────────────────────────────────────────────────
+
+export async function getAssistants() {
+  return vapiClient.listAssistants();
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+function mapVapiOutcome(
+  evaluation?: string,
+  structured?: Record<string, unknown>,
+): string {
+  if (structured?.outcome) {
+    const o = String(structured.outcome).toLowerCase();
+    if (o === "scheduled") return "SCHEDULED";
+    if (o === "deposit_requested") return "DEPOSIT_REQUESTED";
+    if (o === "callback") return "CALLBACK";
+    if (o === "not_interested") return "NOT_INTERESTED";
+    if (o === "voicemail") return "VOICEMAIL";
+    if (o === "interested") return "INTERESTED";
+  }
+
   if (!evaluation) return "ERROR";
   const lower = evaluation.toLowerCase();
+  if (lower.includes("scheduled")) return "SCHEDULED";
   if (lower.includes("success") || lower.includes("interested")) return "INTERESTED";
   if (lower.includes("callback") || lower.includes("later")) return "CALLBACK";
   if (lower.includes("transfer")) return "TRANSFERRED";
@@ -141,7 +307,69 @@ function mapVapiOutcome(evaluation?: string): "INTERESTED" | "NOT_INTERESTED" | 
   return "NOT_INTERESTED";
 }
 
-// Get VAPI assistants
-export async function getAssistants() {
-  return vapiClient.listAssistants();
+function mapOutcomeToCrmStage(outcome: string, _structured: Record<string, unknown>): string {
+  if (outcome === "SCHEDULED") return "SCHEDULED";
+  if (outcome === "DEPOSIT_REQUESTED") return "CHECKLIST_SENT";
+  if (outcome === "INTERESTED") return "LEAD_QUALIFIED";
+  if (outcome === "CALLBACK") return "LEAD_NEW";
+  return "LEAD_NEW";
+}
+
+function buildTags(outcome: string, structured: Record<string, unknown>): string[] {
+  const tags: string[] = [];
+
+  if (outcome === "INTERESTED" || outcome === "SCHEDULED") tags.push("lead-qualified");
+  if (outcome === "SCHEDULED") tags.push("scheduled");
+  if (outcome === "CALLBACK") tags.push("callback-requested");
+  if (outcome === "DEPOSIT_REQUESTED") tags.push("deposit-required");
+
+  if (structured.serviceType) {
+    const st = String(structured.serviceType).toLowerCase();
+    if (st.includes("deep")) tags.push("deep-cleaning", "deposit-required");
+    else if (st.includes("standard")) tags.push("standard-cleaning");
+    else if (st.includes("recurring")) tags.push("recurring-client");
+    else if (st.includes("move")) tags.push("move-cleaning");
+  }
+
+  if (String(structured.language || "").toLowerCase() === "es") tags.push("spanish-speaker");
+
+  return tags;
+}
+
+function mapPropertyType(value: string): string | undefined {
+  const map: Record<string, string> = {
+    house: "HOUSE",
+    apartment: "APARTMENT",
+    condo: "CONDO",
+    office: "OFFICE",
+  };
+  return map[value.toLowerCase()];
+}
+
+function mapConditionLevel(value: string): string | undefined {
+  const map: Record<string, string> = {
+    light: "LIGHT",
+    moderate: "MODERATE",
+    heavy: "HEAVY",
+  };
+  return map[value.toLowerCase()];
+}
+
+function mapServiceType(value: string): string | undefined {
+  const lower = value.toLowerCase();
+  if (lower.includes("deep")) return "DEEP_CLEANING";
+  if (lower.includes("standard")) return "STANDARD_CLEANING";
+  if (lower.includes("recurring")) return "RECURRING";
+  if (lower.includes("move_in") || lower.includes("move-in")) return "MOVE_IN";
+  if (lower.includes("move_out") || lower.includes("move-out")) return "MOVE_OUT";
+  if (lower.includes("construction")) return "POST_CONSTRUCTION";
+  return undefined;
+}
+
+function mapFrequency(value: string): string {
+  const lower = value.toLowerCase();
+  if (lower.includes("bi") && lower.includes("weekly")) return "BI_WEEKLY";
+  if (lower.includes("weekly")) return "WEEKLY";
+  if (lower.includes("monthly")) return "MONTHLY";
+  return "ONE_TIME";
 }

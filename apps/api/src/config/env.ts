@@ -24,6 +24,11 @@ const envSchema = z.object({
 
   // N8N
   N8N_WEBHOOK_URL: z.string().optional(),
+
+  // Notifications
+  RESEND_API_KEY: z.string().optional(),
+  NOTIFICATION_EMAIL: z.string().email().optional(),
+  NOTIFICATION_PHONE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

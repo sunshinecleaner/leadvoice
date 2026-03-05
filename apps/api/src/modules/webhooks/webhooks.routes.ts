@@ -5,30 +5,53 @@ import * as vapiService from "../vapi/vapi.service.js";
 import { prisma } from "@leadvoice/database";
 
 export async function webhooksRoutes(app: FastifyInstance) {
-  // VAPI webhook — receives call events
+  // ─── VAPI webhook ────────────────────────────────────────────────────────────
   app.post("/vapi", async (request, reply) => {
     const body = request.body as {
       message: {
         type: string;
-        call?: { id: string; [key: string]: unknown };
+        call?: {
+          id: string;
+          type?: string;
+          customer?: { number: string };
+          [key: string]: unknown;
+        };
         [key: string]: unknown;
       };
     };
 
     const messageType = body?.message?.type;
+    const vapiCallId = body?.message?.call?.id;
 
-    logger.info({ type: messageType }, "VAPI webhook received");
+    logger.info({ type: messageType, vapiCallId }, "VAPI webhook received");
 
     switch (messageType) {
+      // Inbound call just started — find or create lead immediately
+      case "call-started": {
+        const callType = body.message.call?.type;
+        if (callType === "inboundPhoneCall") {
+          const callerPhone = body.message.call?.customer?.number;
+          if (vapiCallId && callerPhone) {
+            await vapiService.processInboundCallStarted(vapiCallId, callerPhone);
+          }
+        }
+        break;
+      }
+
+      // Full call report when call ends — main event
       case "end-of-call-report": {
         const callData = body.message as unknown as {
-          call: { id: string };
+          call: { id: string; type?: string; customer?: { number: string } };
           recordingUrl?: string;
           transcript?: string;
           summary?: string;
           duration?: number;
           cost?: number;
-          analysis?: { successEvaluation?: string; summary?: string; structuredData?: Record<string, unknown> };
+          analysis?: {
+            successEvaluation?: string;
+            summary?: string;
+            structuredData?: Record<string, unknown>;
+          };
         };
 
         if (callData.call?.id) {
@@ -40,6 +63,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
             duration: callData.duration || 0,
             cost: callData.cost || 0,
             analysis: callData.analysis as any,
+            customerPhone: callData.call.customer?.number,
           } as any);
         }
         break;
@@ -47,15 +71,13 @@ export async function webhooksRoutes(app: FastifyInstance) {
 
       case "status-update": {
         const status = (body.message as any).status;
-        const callId = body.message.call?.id;
-        logger.info({ callId, status }, "VAPI call status update");
+        logger.info({ vapiCallId, status }, "VAPI call status update");
         break;
       }
 
-      case "transcript": {
-        logger.debug("VAPI transcript update received");
+      case "transcript":
+        logger.debug({ vapiCallId }, "VAPI transcript chunk received");
         break;
-      }
 
       default:
         logger.debug({ type: messageType }, "Unhandled VAPI webhook type");
@@ -64,7 +86,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
     return reply.send({ success: true });
   });
 
-  // N8N webhook — receive actions from N8N workflows
+  // ─── N8N webhook ─────────────────────────────────────────────────────────────
   app.post("/n8n", async (request, reply) => {
     const body = z
       .object({
@@ -83,7 +105,6 @@ export async function webhooksRoutes(app: FastifyInstance) {
             lastName: String(body.data.lastName || ""),
             phone: String(body.data.phone || ""),
             email: body.data.email ? String(body.data.email) : undefined,
-            company: body.data.company ? String(body.data.company) : undefined,
             source: "API",
             metadata: body.data.metadata as any,
           },
@@ -117,12 +138,11 @@ export async function webhooksRoutes(app: FastifyInstance) {
     }
   });
 
-  // Generic webhook — for external integrations (Zapier, Make, etc.)
+  // ─── Generic inbound webhook ─────────────────────────────────────────────────
   app.post("/inbound", async (request, reply) => {
     const body = request.body as Record<string, unknown>;
     logger.info({ keys: Object.keys(body) }, "Inbound webhook received");
 
-    // Store as a new lead if it has phone data
     if (body.phone) {
       const lead = await prisma.lead.create({
         data: {
@@ -130,9 +150,8 @@ export async function webhooksRoutes(app: FastifyInstance) {
           lastName: String(body.lastName || body.last_name || ""),
           phone: String(body.phone),
           email: body.email ? String(body.email) : undefined,
-          company: body.company ? String(body.company) : undefined,
           source: "API",
-          metadata: body,
+          metadata: body as any,
         },
       });
       return reply.status(201).send({ success: true, data: lead });
