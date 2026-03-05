@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Data extracted from a Sunshine Cleaning call by SunnyBee AI. This schema is used in VAPI's analysis.structuredData configuration.",
+  "type": "object",
+  "properties": {
+    "firstName": {
+      "type": "string",
+      "description": "Caller's first name"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "Caller's last name"
+    },
+    "address": {
+      "type": "string",
+      "description": "Property street address"
+    },
+    "city": {
+      "type": "string",
+      "description": "Property city"
+    },
+    "state": {
+      "type": "string",
+      "description": "Property state abbreviation (GA, TX, MA, FL)"
+    },
+    "zipCode": {
+      "type": "string",
+      "description": "Property zip code"
+    },
+    "propertyType": {
+      "type": "string",
+      "enum": ["house", "apartment", "condo", "office"],
+      "description": "Type of property to be cleaned"
+    },
+    "bedrooms": {
+      "type": "integer",
+      "description": "Number of bedrooms"
+    },
+    "bathrooms": {
+      "type": "integer",
+      "description": "Number of bathrooms"
+    },
+    "sqft": {
+      "type": "integer",
+      "description": "Approximate square footage of the property"
+    },
+    "isOccupied": {
+      "type": "boolean",
+      "description": "Whether the property is currently occupied"
+    },
+    "conditionLevel": {
+      "type": "string",
+      "enum": ["light", "moderate", "heavy"],
+      "description": "Current cleanliness condition: light (routine), moderate (visible dirt), heavy (strong buildup)"
+    },
+    "serviceType": {
+      "type": "string",
+      "enum": ["standard_cleaning", "deep_cleaning", "recurring", "move_in", "move_out", "post_construction"],
+      "description": "Type of cleaning service requested"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": ["one_time", "weekly", "bi_weekly", "monthly"],
+      "description": "How often the service should repeat"
+    },
+    "addOns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional areas/services requested: inside_oven, inside_fridge, inside_cabinets, baseboards, blinds, walls, garage, laundry, pet_hair, organization"
+    },
+    "preferredSchedule": {
+      "type": "string",
+      "description": "Preferred days and time of day (e.g., 'weekday mornings', 'Saturday afternoon')"
+    },
+    "language": {
+      "type": "string",
+      "enum": ["en", "es"],
+      "description": "Language the caller spoke during the call"
+    },
+    "contactPreference": {
+      "type": "string",
+      "enum": ["call", "text"],
+      "description": "How the caller prefers to be contacted"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["interested", "scheduled", "deposit_requested", "callback", "not_interested", "voicemail"],
+      "description": "Call outcome based on the conversation"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Any additional notes or special requests mentioned by the caller"
+    }
+  },
+  "required": ["firstName", "outcome"]
+}

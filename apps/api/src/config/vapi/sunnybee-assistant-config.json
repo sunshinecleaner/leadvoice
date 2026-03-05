@@ -1,0 +1,38 @@
+{
+  "_comment": "VAPI Assistant configuration for SunnyBee. Use this to create the assistant via VAPI Dashboard or API.",
+
+  "name": "SunnyBee",
+
+  "firstMessage": "Hello, thank you for calling Sunshine Cleaning. This is SunnyBee, your virtual assistant. I'm here to help you with scheduling and service information. How can I assist you today?",
+
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4o-realtime-preview",
+    "systemPrompt": "SEE sunnybee-prompt.md — paste the full content there"
+  },
+
+  "voice": {
+    "provider": "openai",
+    "voiceId": "shimmer"
+  },
+
+  "serverUrl": "https://sunshine-leadvoice-api.lxlgch.easypanel.host/api/webhooks/vapi",
+
+  "analysisPlan": {
+    "summaryPrompt": "Summarize this cleaning service call. Include: caller name, property details, service requested, condition level, any special requests, and the outcome.",
+    "successEvaluationPrompt": "Evaluate if this call was successful. A call is successful if the caller expressed interest in booking a cleaning service AND provided at minimum their name and property type. Return 'success' if interested, 'callback' if they want to be called back, 'not_interested' if they declined.",
+    "structuredDataPrompt": "Extract the following information from the call transcript. Only include fields that were explicitly mentioned. For outcome: use 'interested' if they want a quote, 'scheduled' if a date was agreed upon, 'deposit_requested' if deep cleaning deposit was discussed, 'callback' if they want to be called back, 'not_interested' if they declined, 'voicemail' if it went to voicemail.",
+    "structuredDataSchema": "SEE sunnybee-structured-data.json"
+  },
+
+  "recordingEnabled": true,
+  "silenceTimeoutSeconds": 30,
+  "maxDurationSeconds": 600,
+  "endCallMessage": "Thank you for contacting Sunshine Cleaning. You'll receive a text message shortly with the next steps. Have a wonderful day!",
+  "endCallPhrases": ["goodbye", "have a nice day", "no thank you", "not interested", "adios", "gracias"],
+
+  "metadata": {
+    "company": "Sunshine WL Brazilian",
+    "version": "1.0"
+  }
+}
