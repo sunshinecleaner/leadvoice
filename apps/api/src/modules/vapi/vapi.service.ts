@@ -182,7 +182,7 @@ export async function processCallCompleted(
     });
   }
 
-  await triggerN8N("call_completed", {
+  const n8nPayload = {
     callId: call.id,
     leadId: call.leadId,
     vapiCallId,
@@ -191,7 +191,15 @@ export async function processCallCompleted(
     transcript: vapiData.transcript,
     summary: vapiData.summary,
     structuredData: structured,
-  });
+  };
+
+  await triggerN8N("call_completed", n8nPayload);
+
+  // Send SMS alert for qualified leads
+  const qualifiedOutcomes = ["INTERESTED", "SCHEDULED", "DEPOSIT_REQUESTED"];
+  if (qualifiedOutcomes.includes(outcome)) {
+    await triggerN8NSms(n8nPayload);
+  }
 
   logger.info({ callId: call.id, outcome, duration: vapiData.duration }, "Call completed");
   return updated;
@@ -272,6 +280,21 @@ async function triggerN8N(event: string, data: Record<string, unknown>) {
     logger.info({ event }, "N8N webhook triggered");
   } catch (error) {
     logger.error({ error, event }, "Failed to trigger N8N webhook");
+  }
+}
+
+async function triggerN8NSms(data: Record<string, unknown>) {
+  if (!env.N8N_SMS_WEBHOOK_URL) return;
+
+  try {
+    await fetch(env.N8N_SMS_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "sms_alert", data, timestamp: new Date().toISOString() }),
+    });
+    logger.info("N8N SMS webhook triggered");
+  } catch (error) {
+    logger.error({ error }, "Failed to trigger N8N SMS webhook");
   }
 }
 

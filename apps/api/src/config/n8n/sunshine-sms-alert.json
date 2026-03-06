@@ -1,0 +1,57 @@
+{
+  "name": "Sunshine - SMS Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sms-alert",
+        "options": {}
+      },
+      "id": "webhook-sms",
+      "name": "Webhook - SMS Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "sms-alert"
+    },
+    {
+      "parameters": {
+        "from": "+14708884921",
+        "to": "={{ $json.phone || '+14708884921' }}",
+        "message": "=🔔 New Lead — Sunshine Cleaning\n\nName: {{ $json.data.structuredData.firstName }} {{ $json.data.structuredData.lastName }}\nPhone: {{ $json.data.structuredData.phone || 'N/A' }}\nService: {{ $json.data.structuredData.serviceType || 'Not specified' }}\nProperty: {{ $json.data.structuredData.propertyType || '' }} {{ $json.data.structuredData.bedrooms || '?' }}bd/{{ $json.data.structuredData.bathrooms || '?' }}ba\nCondition: {{ $json.data.structuredData.conditionLevel || 'N/A' }}\nOutcome: {{ $json.data.outcome }}\n\n— SunnyBee AI"
+      },
+      "id": "twilio-sms",
+      "name": "Twilio - Send SMS to Welica",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio - Configure Me"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - SMS Alert": {
+      "main": [
+        [
+          {
+            "node": "Twilio - Send SMS to Welica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "sunshine"
+    }
+  ]
+}

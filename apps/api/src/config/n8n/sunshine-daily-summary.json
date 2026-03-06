@@ -1,0 +1,173 @@
+{
+  "name": "Sunshine - Daily Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 20,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule - Daily 8PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://sunshine-leadvoice-api.lxlgch.easypanel.host/api/dashboard/stats",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-stats",
+      "name": "HTTP - Fetch Daily Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "API Auth - Configure Me"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://sunshine-leadvoice-api.lxlgch.easypanel.host/api/leads?createdAfter={{ $now.minus(1, 'day').toISO() }}&limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-leads",
+      "name": "HTTP - Fetch Today Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "API Auth - Configure Me"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByPosition": true,
+        "options": {}
+      },
+      "id": "merge-data",
+      "name": "Merge Stats + Leads",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const stats = $input.first().json;\nconst leads = $input.last().json;\n\nconst today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\n\nconst totalCalls = stats.data?.totalCalls || 0;\nconst qualifiedLeads = stats.data?.qualifiedLeads || 0;\nconst conversionRate = totalCalls > 0 ? ((qualifiedLeads / totalCalls) * 100).toFixed(1) : '0';\n\nconst leadsList = (leads.data || []).map(l => {\n  const name = `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Unknown';\n  const service = l.serviceType || 'Not specified';\n  const stage = l.crmStage || 'NEW';\n  return `<tr><td style=\"padding:6px 10px;border-bottom:1px solid #eee;\">${name}</td><td style=\"padding:6px 10px;border-bottom:1px solid #eee;\">${l.phone || 'N/A'}</td><td style=\"padding:6px 10px;border-bottom:1px solid #eee;\">${service}</td><td style=\"padding:6px 10px;border-bottom:1px solid #eee;\">${stage}</td></tr>`;\n}).join('');\n\nconst noLeadsRow = leadsList ? '' : '<tr><td colspan=\"4\" style=\"padding:12px;text-align:center;color:#888;\">No new leads today</td></tr>';\n\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:650px;margin:0 auto;\">\n  <div style=\"background:#1e40af;color:white;padding:20px;border-radius:8px 8px 0 0;\">\n    <h1 style=\"margin:0;font-size:22px;\">☀️ Sunshine Cleaning — Daily Report</h1>\n    <p style=\"margin:5px 0 0;opacity:0.9;\">${today}</p>\n  </div>\n  \n  <div style=\"background:#f8fafc;padding:20px;\">\n    <table style=\"width:100%;border-collapse:collapse;\">\n      <tr>\n        <td style=\"text-align:center;padding:15px;\">\n          <div style=\"font-size:32px;font-weight:bold;color:#1e40af;\">${totalCalls}</div>\n          <div style=\"color:#64748b;font-size:13px;\">Total Calls</div>\n        </td>\n        <td style=\"text-align:center;padding:15px;\">\n          <div style=\"font-size:32px;font-weight:bold;color:#22c55e;\">${qualifiedLeads}</div>\n          <div style=\"color:#64748b;font-size:13px;\">Qualified Leads</div>\n        </td>\n        <td style=\"text-align:center;padding:15px;\">\n          <div style=\"font-size:32px;font-weight:bold;color:#f59e0b;\">${conversionRate}%</div>\n          <div style=\"color:#64748b;font-size:13px;\">Conversion Rate</div>\n        </td>\n      </tr>\n    </table>\n  </div>\n\n  <div style=\"padding:20px;\">\n    <h2 style=\"font-size:16px;color:#334155;margin-bottom:10px;\">Today's Leads</h2>\n    <table style=\"width:100%;border-collapse:collapse;font-size:14px;\">\n      <thead>\n        <tr style=\"background:#e2e8f0;\">\n          <th style=\"padding:8px 10px;text-align:left;\">Name</th>\n          <th style=\"padding:8px 10px;text-align:left;\">Phone</th>\n          <th style=\"padding:8px 10px;text-align:left;\">Service</th>\n          <th style=\"padding:8px 10px;text-align:left;\">Stage</th>\n        </tr>\n      </thead>\n      <tbody>\n        ${leadsList}${noLeadsRow}\n      </tbody>\n    </table>\n  </div>\n\n  <div style=\"background:#f1f5f9;padding:15px;border-radius:0 0 8px 8px;text-align:center;\">\n    <p style=\"color:#94a3b8;font-size:12px;margin:0;\">Sent by SunnyBee AI — Sunshine Cleaning Daily Report</p>\n  </div>\n</div>`;\n\nreturn [{ json: { subject: `☀️ Daily Report — ${today} | ${qualifiedLeads} Qualified Leads`, html, today, totalCalls, qualifiedLeads, conversionRate } }];"
+      },
+      "id": "build-email",
+      "name": "Code - Build Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "sendTo": "vpswelica@paviani.net",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "send-gmail",
+      "name": "Gmail - Send Daily Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, 400],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail - Configure Me"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Daily 8PM": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Fetch Daily Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP - Fetch Today Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Fetch Daily Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge Stats + Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Fetch Today Leads": {
+      "main": [
+        [
+          {
+            "node": "Merge Stats + Leads",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Stats + Leads": {
+      "main": [
+        [
+          {
+            "node": "Code - Build Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Send Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York"
+  },
+  "tags": [
+    {
+      "name": "sunshine"
+    }
+  ]
+}

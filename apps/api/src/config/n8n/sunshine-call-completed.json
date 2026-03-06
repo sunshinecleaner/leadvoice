@@ -1,0 +1,168 @@
+{
+  "name": "Sunshine - Call Completed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "call-completed",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Call Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "call-completed"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1COAENwfmq7U881U7cvSAts85lmf8N-ZO5xdmx4J_ipM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.timestamp }}",
+            "Name": "={{ $json.data.structuredData.firstName }} {{ $json.data.structuredData.lastName }}",
+            "Phone": "={{ $json.data.structuredData.phone || 'N/A' }}",
+            "Address": "={{ $json.data.structuredData.address || '' }}",
+            "City": "={{ $json.data.structuredData.city || '' }}",
+            "State": "={{ $json.data.structuredData.state || '' }}",
+            "Zip": "={{ $json.data.structuredData.zipCode || '' }}",
+            "Property Type": "={{ $json.data.structuredData.propertyType || '' }}",
+            "Beds": "={{ $json.data.structuredData.bedrooms || '' }}",
+            "Baths": "={{ $json.data.structuredData.bathrooms || '' }}",
+            "Sqft": "={{ $json.data.structuredData.sqft || '' }}",
+            "Condition": "={{ $json.data.structuredData.conditionLevel || '' }}",
+            "Service Type": "={{ $json.data.structuredData.serviceType || '' }}",
+            "Frequency": "={{ $json.data.structuredData.frequency || '' }}",
+            "Add-ons": "={{ ($json.data.structuredData.addOns || []).join(', ') }}",
+            "Schedule": "={{ $json.data.structuredData.preferredSchedule || '' }}",
+            "Language": "={{ $json.data.structuredData.language || 'en' }}",
+            "Outcome": "={{ $json.data.outcome }}",
+            "Notes": "={{ $json.data.summary || '' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "google-sheets",
+      "name": "Google Sheets - Add Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [480, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets - Configure Me"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "condition-interested",
+              "leftValue": "={{ $json.data.outcome }}",
+              "rightValue": "INTERESTED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "if-qualified",
+      "name": "IF - Lead Qualified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 440]
+    },
+    {
+      "parameters": {
+        "sendTo": "vpswelica@paviani.net",
+        "subject": "=🔔 New Qualified Lead - {{ $json.data.structuredData.firstName }} {{ $json.data.structuredData.lastName }}",
+        "message": "=<h2>New Qualified Lead from SunnyBee</h2>\n<table style=\"border-collapse:collapse;width:100%;max-width:600px;font-family:Arial,sans-serif;\">\n<tr style=\"background:#f8f9fa;\"><td style=\"padding:8px;font-weight:bold;\">Name</td><td style=\"padding:8px;\">{{ $json.data.structuredData.firstName }} {{ $json.data.structuredData.lastName }}</td></tr>\n<tr><td style=\"padding:8px;font-weight:bold;\">Phone</td><td style=\"padding:8px;\">{{ $json.data.structuredData.phone || 'N/A' }}</td></tr>\n<tr style=\"background:#f8f9fa;\"><td style=\"padding:8px;font-weight:bold;\">Outcome</td><td style=\"padding:8px;\"><strong style=\"color:#22c55e;\">{{ $json.data.outcome }}</strong></td></tr>\n<tr><td style=\"padding:8px;font-weight:bold;\">Service</td><td style=\"padding:8px;\">{{ $json.data.structuredData.serviceType || 'Not specified' }}</td></tr>\n<tr style=\"background:#f8f9fa;\"><td style=\"padding:8px;font-weight:bold;\">Property</td><td style=\"padding:8px;\">{{ $json.data.structuredData.propertyType || '' }} - {{ $json.data.structuredData.bedrooms || '?' }} bed / {{ $json.data.structuredData.bathrooms || '?' }} bath</td></tr>\n<tr><td style=\"padding:8px;font-weight:bold;\">Condition</td><td style=\"padding:8px;\">{{ $json.data.structuredData.conditionLevel || 'Not specified' }}</td></tr>\n<tr style=\"background:#f8f9fa;\"><td style=\"padding:8px;font-weight:bold;\">Schedule</td><td style=\"padding:8px;\">{{ $json.data.structuredData.preferredSchedule || 'Not specified' }}</td></tr>\n<tr><td style=\"padding:8px;font-weight:bold;\">Duration</td><td style=\"padding:8px;\">{{ $json.data.duration }}s</td></tr>\n</table>\n<br>\n<h3>Call Summary</h3>\n<p style=\"background:#f0f0f0;padding:12px;border-radius:8px;\">{{ $json.data.summary || 'No summary available' }}</p>\n<br>\n<p style=\"color:#888;font-size:12px;\">Sent by SunnyBee AI - Sunshine Cleaning</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "send-email",
+      "name": "Gmail - Notify Welica",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [720, 380],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail - Configure Me"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "No Operation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [720, 520]
+    }
+  ],
+  "connections": {
+    "Webhook - Call Completed": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Add Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF - Lead Qualified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Lead Qualified": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Notify Welica",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "sunshine"
+    }
+  ]
+}
