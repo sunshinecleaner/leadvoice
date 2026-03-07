@@ -135,6 +135,13 @@ export async function processCallCompleted(
   const structured = (vapiData.analysis?.structuredData ?? {}) as Record<string, unknown>;
   const outcome = mapVapiOutcome(vapiData.analysis?.successEvaluation, structured);
 
+  logger.info({
+    successEvaluation: vapiData.analysis?.successEvaluation,
+    structuredData: structured,
+    mappedOutcome: outcome,
+    summary: vapiData.summary,
+  }, "VAPI call analysis data");
+
   const updated = await (prisma.call.update as any)({
     where: { id: call.id },
     data: {
