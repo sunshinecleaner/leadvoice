@@ -40,6 +40,9 @@ export async function webhooksRoutes(app: FastifyInstance) {
 
       // Full call report when call ends — main event
       case "end-of-call-report": {
+        // Log full payload to find where VAPI puts structured data
+        logger.info({ fullPayload: JSON.stringify(body.message).slice(0, 8000) }, "VAPI end-of-call-report FULL PAYLOAD");
+
         const callData = body.message as unknown as {
           call: { id: string; type?: string; customer?: { number: string } };
           recordingUrl?: string;
