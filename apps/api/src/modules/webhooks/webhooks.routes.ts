@@ -55,9 +55,33 @@ export async function webhooksRoutes(app: FastifyInstance) {
             summary?: string;
             structuredData?: Record<string, unknown>;
           };
+          // VAPI may put structured outputs at different locations
+          structuredData?: Record<string, unknown>;
+          structuredOutputs?: Record<string, unknown>;
         };
 
+        // Look for structured data in multiple possible locations
+        const msg = body.message as any;
+        const structuredData =
+          callData.analysis?.structuredData ||
+          callData.structuredData ||
+          callData.structuredOutputs ||
+          msg.structuredData ||
+          msg.structuredOutputs ||
+          {};
+
+        // Log all top-level keys to find where VAPI puts structured data
+        logger.info({ topLevelKeys: Object.keys(msg), analysisKeys: msg.analysis ? Object.keys(msg.analysis) : [] }, "VAPI payload keys");
+
         if (callData.call?.id) {
+          // Merge structuredData into analysis if found outside
+          const analysis = {
+            ...callData.analysis,
+            structuredData: Object.keys(structuredData).length > 0
+              ? structuredData
+              : callData.analysis?.structuredData,
+          };
+
           await vapiService.processCallCompleted(callData.call.id, {
             id: callData.call.id,
             recordingUrl: callData.recordingUrl || "",
@@ -65,7 +89,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
             summary: callData.summary || "",
             duration: callData.duration || 0,
             cost: callData.cost || 0,
-            analysis: callData.analysis as any,
+            analysis: analysis as any,
             customerPhone: callData.call.customer?.number,
           } as any);
         }

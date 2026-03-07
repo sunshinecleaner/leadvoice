@@ -326,6 +326,8 @@ function mapVapiOutcome(
 
   if (!evaluation) return "ERROR";
   const lower = evaluation.toLowerCase();
+  if (lower === "true") return "INTERESTED";
+  if (lower === "false") return "NOT_INTERESTED";
   if (lower.includes("scheduled")) return "SCHEDULED";
   if (lower.includes("success") || lower.includes("interested")) return "INTERESTED";
   if (lower.includes("callback") || lower.includes("later")) return "CALLBACK";
