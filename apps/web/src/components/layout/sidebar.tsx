@@ -8,7 +8,7 @@ import {
   Megaphone,
   Phone,
   BarChart3,
-  Plug,
+
   Settings,
   LogOut,
 } from "lucide-react";
@@ -22,7 +22,6 @@ const navItems = [
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/integrations", label: "Integrations", icon: Plug },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
