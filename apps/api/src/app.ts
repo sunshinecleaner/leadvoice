@@ -8,7 +8,7 @@ import { AppError } from "./utils/errors.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { leadsRoutes } from "./modules/leads/leads.routes.js";
 import { campaignsRoutes } from "./modules/campaigns/campaigns.routes.js";
-import { dashboardRoutes } from "./modules/dashboard/dashboard.routes.js";
+import { dashboardRoutes, dashboardPublicRoutes } from "./modules/dashboard/dashboard.routes.js";
 import { vapiRoutes } from "./modules/vapi/vapi.routes.js";
 import { webhooksRoutes } from "./modules/webhooks/webhooks.routes.js";
 
@@ -77,6 +77,7 @@ export async function buildApp() {
   await app.register(leadsRoutes, { prefix: "/api/leads" });
   await app.register(campaignsRoutes, { prefix: "/api/campaigns" });
   await app.register(dashboardRoutes, { prefix: "/api/dashboard" });
+  await app.register(dashboardPublicRoutes, { prefix: "/api/public/dashboard" });
   await app.register(vapiRoutes, { prefix: "/api/vapi" });
   await app.register(webhooksRoutes, { prefix: "/api/webhooks" });
 

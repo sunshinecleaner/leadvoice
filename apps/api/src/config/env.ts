@@ -28,6 +28,7 @@ const envSchema = z.object({
   // N8N
   N8N_WEBHOOK_URL: z.string().optional(),
   N8N_SMS_WEBHOOK_URL: z.string().optional(),
+  N8N_API_KEY: z.string().optional(),
 
   // Notifications
   RESEND_API_KEY: z.string().optional(),
