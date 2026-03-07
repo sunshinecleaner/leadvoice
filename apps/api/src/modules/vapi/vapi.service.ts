@@ -124,15 +124,12 @@ export async function processCallCompleted(
     call = await prisma.call.findFirst({ where: { twilioCallSid: vapiCallId } });
   }
 
-  // For inbound calls that started without being tracked
-  if (!call && vapiData.customerPhone) {
-    const result = await processInboundCallStarted(vapiCallId, vapiData.customerPhone);
-    call = result.call;
-  }
-
+  // For calls that started without being tracked (inbound or test calls)
   if (!call) {
-    logger.warn({ vapiCallId }, "Received webhook for unknown call");
-    return null;
+    const phone = vapiData.customerPhone || "test-call";
+    logger.info({ vapiCallId, phone }, "Creating call record for untracked call");
+    const result = await processInboundCallStarted(vapiCallId, phone);
+    call = result.call;
   }
 
   const structured = (vapiData.analysis?.structuredData ?? {}) as Record<string, unknown>;
