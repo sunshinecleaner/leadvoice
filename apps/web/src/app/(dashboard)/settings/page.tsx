@@ -1,125 +1,366 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useAuthStore } from "@/stores/auth-store";
+import { api } from "@/lib/api";
+import {
+  User,
+  Building2,
+  Phone,
+  Globe,
+  ExternalLink,
+  Lock,
+  Bell,
+  Clock,
+} from "lucide-react";
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  createdAt: string;
+}
 
 export default function SettingsPage() {
+  const { user, token } = useAuthStore();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (token) {
+      api<{ success: boolean; data: UserProfile }>("/api/auth/me", { token })
+        .then((res) => {
+          setProfile(res.data);
+          setName(res.data.name);
+          setEmail(res.data.email);
+        })
+        .catch(() => {});
+    }
+  }, [token]);
+
+  const showMessage = (type: "success" | "error", text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      await api("/api/auth/profile", {
+        token,
+        method: "PATCH",
+        body: JSON.stringify({ name, email }),
+      });
+      showMessage("success", "Profile updated successfully");
+    } catch (err: any) {
+      showMessage("error", err.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!token) return;
+    if (newPassword !== confirmPassword) {
+      showMessage("error", "Passwords don't match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      showMessage("error", "Password must be at least 6 characters");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api("/api/auth/change-password", {
+        token,
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      showMessage("success", "Password changed successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      showMessage("error", err.message || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   return (
     <>
-      <Header title="Settings" description="Manage your account and system settings" />
+      <Header title="Settings" description="Manage your profile, company info, and preferences" />
       <div className="p-6 max-w-2xl space-y-6">
+        {message && (
+          <div
+            className={`p-3 rounded-md text-sm ${
+              message.type === "success"
+                ? "bg-green-500/10 text-green-500 border border-green-500/20"
+                : "bg-red-500/10 text-red-500 border border-red-500/20"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
+        {/* ─── Profile ─────────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">VAPI Configuration</CardTitle>
-                <CardDescription>Configure your VAPI account for AI voice agents</CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
               </div>
-              <Badge variant="outline">Voice AI</Badge>
+              <div>
+                <CardTitle className="text-base">Profile</CardTitle>
+                <CardDescription>Your personal account information</CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">VAPI API Key</label>
-              <Input type="password" placeholder="Your VAPI API key" />
+              <label className="text-sm font-medium">Full Name</label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+              />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number ID</label>
-              <Input placeholder="VAPI phone number ID" />
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Default Assistant ID</label>
-              <Input placeholder="VAPI assistant ID" />
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Role: <Badge variant="outline" className="ml-1">{profile?.role || user?.role || "AGENT"}</Badge>
+              </div>
+              <Button onClick={handleUpdateProfile} disabled={saving} size="sm">
+                {saving ? "Saving..." : "Save Profile"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Webhook Secret</label>
-              <Input type="password" placeholder="For verifying VAPI webhooks" />
-            </div>
-            <Button>Save VAPI Settings</Button>
           </CardContent>
         </Card>
 
+        {/* ─── Change Password ─────────────────────────────── */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Twilio Configuration</CardTitle>
-                <CardDescription>Phone numbers and call infrastructure (connected via VAPI)</CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-orange-500/10">
+                <Lock className="h-5 w-5 text-orange-500" />
               </div>
-              <Badge variant="outline">Telephony</Badge>
+              <div>
+                <CardTitle className="text-base">Change Password</CardTitle>
+                <CardDescription>Update your account password</CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Account SID</label>
-              <Input placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+              <label className="text-sm font-medium">Current Password</label>
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+              />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Auth Token</label>
-              <Input type="password" placeholder="Your Twilio auth token" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">New Password</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Confirm Password</label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Phone Number</label>
-              <Input placeholder="+1234567890" />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || !currentPassword || !newPassword}
+                size="sm"
+                variant="outline"
+              >
+                {changingPassword ? "Changing..." : "Change Password"}
+              </Button>
             </div>
-            <Button>Save Twilio Settings</Button>
           </CardContent>
         </Card>
 
+        {/* ─── Company Info ────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">N8N Integration</CardTitle>
-                <CardDescription>Workflow automation webhook URL</CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-blue-500/10">
+                <Building2 className="h-5 w-5 text-blue-500" />
               </div>
-              <Badge variant="outline">Automation</Badge>
+              <div>
+                <CardTitle className="text-base">Company</CardTitle>
+                <CardDescription>Sunshine WL Brazilian Cleaning Service</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Founded</p>
+                <p className="font-medium">2015</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Owner</p>
+                <p className="font-medium">Welica Nunes</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Headquarters</p>
+                <p className="font-medium">Marietta, GA</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Service Areas</p>
+                <p className="font-medium">GA, TX, MA, FL</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ─── Connected Services ──────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-green-500/10">
+                <Globe className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Connected Services</CardTitle>
+                <CardDescription>External platforms linked to LeadVoice</CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">N8N Webhook URL</label>
-              <Input placeholder="http://n8n:5678" />
+            <div className="flex items-center justify-between p-3 rounded-md border">
+              <div className="flex items-center gap-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Twilio</p>
+                  <p className="text-xs text-muted-foreground">+1 (470) 888-4921</p>
+                </div>
+              </div>
+              <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Webhook endpoints available for N8N:<br />
-              POST /api/webhooks/n8n — Send actions (create_lead, update_lead, trigger_call)<br />
-              POST /api/webhooks/inbound — Receive leads from external sources
-            </p>
-            <Button>Save N8N Settings</Button>
+
+            <div className="flex items-center justify-between p-3 rounded-md border">
+              <div className="flex items-center gap-3">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">VAPI</p>
+                  <p className="text-xs text-muted-foreground">SunnyBee AI Assistant</p>
+                </div>
+              </div>
+              <a
+                href="https://dashboard.vapi.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Dashboard <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-md border">
+              <div className="flex items-center gap-3">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">N8N Workflows</p>
+                  <p className="text-xs text-muted-foreground">Automation engine</p>
+                </div>
+              </div>
+              <a
+                href="https://workflow.sunshinebrazilian.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Open <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </CardContent>
         </Card>
 
+        {/* ─── Preferences ─────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Calling Rules</CardTitle>
-            <CardDescription>Set default calling windows and retry policies</CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-purple-500/10">
+                <Clock className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Preferences</CardTitle>
+                <CardDescription>System defaults and notification settings</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Calling Window Start</label>
-                <Input type="time" defaultValue="09:00" />
+                <label className="text-sm font-medium">Language</label>
+                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="pt">Portuguese</option>
+                </select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Calling Window End</label>
-                <Input type="time" defaultValue="17:00" />
+                <label className="text-sm font-medium">Timezone</label>
+                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <option value="America/New_York">Eastern (ET)</option>
+                  <option value="America/Chicago">Central (CT)</option>
+                  <option value="America/Denver">Mountain (MT)</option>
+                  <option value="America/Los_Angeles">Pacific (PT)</option>
+                </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Max Retries</label>
-                <Input type="number" defaultValue={3} min={0} max={10} />
+            <div className="flex items-center gap-3 p-3 rounded-md border">
+              <Bell className="h-4 w-4 text-muted-foreground" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Email Notifications</p>
+                <p className="text-xs text-muted-foreground">Receive alerts for qualified leads</p>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Retry Delay (min)</label>
-                <Input type="number" defaultValue={60} min={1} />
-              </div>
+              <Badge className="bg-green-500/10 text-green-500 border-green-500/20">On</Badge>
             </div>
-            <Button>Save Calling Rules</Button>
           </CardContent>
         </Card>
       </div>

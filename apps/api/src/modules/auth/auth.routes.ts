@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { registerSchema, loginSchema } from "./auth.schema.js";
-import { registerUser, loginUser, getUserById } from "./auth.service.js";
+import { registerUser, loginUser, getUserById, updateProfile, changePassword } from "./auth.service.js";
 import { authenticate } from "./auth.middleware.js";
 
 export async function authRoutes(app: FastifyInstance) {
@@ -40,5 +41,25 @@ export async function authRoutes(app: FastifyInstance) {
     const token = app.jwt.sign({ userId, email, role });
 
     return reply.send({ success: true, data: { token } });
+  });
+
+  app.patch("/profile", { preHandler: [authenticate] }, async (request, reply) => {
+    const body = z.object({
+      name: z.string().min(2).max(100).optional(),
+      email: z.string().email().optional(),
+    }).parse(request.body);
+
+    const user = await updateProfile(request.user.userId, body);
+    return reply.send({ success: true, data: user });
+  });
+
+  app.post("/change-password", { preHandler: [authenticate] }, async (request, reply) => {
+    const body = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(6),
+    }).parse(request.body);
+
+    await changePassword(request.user.userId, body.currentPassword, body.newPassword);
+    return reply.send({ success: true, message: "Password changed successfully" });
   });
 }
