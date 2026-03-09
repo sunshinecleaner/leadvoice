@@ -23,6 +23,8 @@ import {
   Lock,
   Bell,
   Clock,
+  DollarSign,
+  RefreshCw,
 } from "lucide-react";
 
 interface UserProfile {
@@ -32,6 +34,24 @@ interface UserProfile {
   role: string;
   avatar?: string;
   createdAt: string;
+}
+
+interface ServiceBalance {
+  service: string;
+  status: "active" | "inactive" | "error";
+  balance?: string;
+  currency?: string;
+  link?: string;
+}
+
+function StatusBadge({ status }: { status?: "active" | "inactive" | "error" }) {
+  if (status === "active") {
+    return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>;
+  }
+  if (status === "error") {
+    return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Error</Badge>;
+  }
+  return <Badge variant="outline">Inactive</Badge>;
 }
 
 export default function SettingsPage() {
@@ -45,6 +65,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [balances, setBalances] = useState<ServiceBalance[]>([]);
+  const [loadingBalances, setLoadingBalances] = useState(false);
+
+  const fetchBalances = () => {
+    if (!token) return;
+    setLoadingBalances(true);
+    api<{ success: boolean; data: ServiceBalance[] }>("/api/integrations/balances", { token })
+      .then((res) => setBalances(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingBalances(false));
+  };
 
   useEffect(() => {
     if (token) {
@@ -55,6 +86,7 @@ export default function SettingsPage() {
           setEmail(res.data.email);
         })
         .catch(() => {});
+      fetchBalances();
     }
   }, [token]);
 
@@ -260,46 +292,113 @@ export default function SettingsPage() {
         {/* ─── Connected Services ──────────────────────────── */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-md bg-green-500/10">
-                <Globe className="h-5 w-5 text-green-500" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-green-500/10">
+                  <Globe className="h-5 w-5 text-green-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Connected Services</CardTitle>
+                  <CardDescription>External platforms linked to LeadVoice</CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-base">Connected Services</CardTitle>
-                <CardDescription>External platforms linked to LeadVoice</CardDescription>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchBalances}
+                disabled={loadingBalances}
+                className="h-8 w-8 p-0"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingBalances ? "animate-spin" : ""}`} />
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-md border">
-              <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Twilio</p>
-                  <p className="text-xs text-muted-foreground">+1 (470) 888-4921</p>
+            {/* Twilio */}
+            {(() => {
+              const twilio = balances.find((b) => b.service === "Twilio");
+              return (
+                <div className="flex items-center justify-between p-3 rounded-md border">
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Twilio</p>
+                      <p className="text-xs text-muted-foreground">+1 (470) 888-4921</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {twilio?.balance && (
+                      <span className="flex items-center gap-1 text-xs font-medium">
+                        <DollarSign className="h-3 w-3" />
+                        {twilio.balance} {twilio.currency}
+                      </span>
+                    )}
+                    <StatusBadge status={twilio?.status} />
+                  </div>
                 </div>
-              </div>
-              <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
-            </div>
+              );
+            })()}
 
-            <div className="flex items-center justify-between p-3 rounded-md border">
-              <div className="flex items-center gap-3">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">VAPI</p>
-                  <p className="text-xs text-muted-foreground">SunnyBee AI Assistant</p>
+            {/* VAPI */}
+            {(() => {
+              const vapi = balances.find((b) => b.service === "VAPI");
+              return (
+                <div className="flex items-center justify-between p-3 rounded-md border">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">VAPI</p>
+                      <p className="text-xs text-muted-foreground">SunnyBee AI Assistant</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {vapi?.balance && (
+                      <span className="flex items-center gap-1 text-xs font-medium">
+                        <DollarSign className="h-3 w-3" />
+                        {vapi.balance} {vapi.currency}
+                      </span>
+                    )}
+                    <a
+                      href="https://dashboard.vapi.ai"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      Dashboard <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
-              </div>
-              <a
-                href="https://dashboard.vapi.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                Dashboard <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
+              );
+            })()}
 
+            {/* OpenAI */}
+            {(() => {
+              const openai = balances.find((b) => b.service === "OpenAI");
+              return (
+                <div className="flex items-center justify-between p-3 rounded-md border">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">OpenAI</p>
+                      <p className="text-xs text-muted-foreground">AI data extraction (gpt-4o-mini)</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={openai?.status} />
+                    <a
+                      href="https://platform.openai.com/usage"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      Usage <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* N8N */}
             <div className="flex items-center justify-between p-3 rounded-md border">
               <div className="flex items-center gap-3">
                 <Globe className="h-4 w-4 text-muted-foreground" />

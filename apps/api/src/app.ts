@@ -11,6 +11,7 @@ import { campaignsRoutes } from "./modules/campaigns/campaigns.routes.js";
 import { dashboardRoutes, dashboardPublicRoutes } from "./modules/dashboard/dashboard.routes.js";
 import { vapiRoutes } from "./modules/vapi/vapi.routes.js";
 import { webhooksRoutes } from "./modules/webhooks/webhooks.routes.js";
+import { integrationsRoutes } from "./modules/integrations/integrations.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -80,6 +81,7 @@ export async function buildApp() {
   await app.register(dashboardPublicRoutes, { prefix: "/api/public/dashboard" });
   await app.register(vapiRoutes, { prefix: "/api/vapi" });
   await app.register(webhooksRoutes, { prefix: "/api/webhooks" });
+  await app.register(integrationsRoutes, { prefix: "/api/integrations" });
 
   return app;
 }
