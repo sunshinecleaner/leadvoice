@@ -132,7 +132,14 @@ export async function processCallCompleted(
     call = result.call;
   }
 
-  const structured = (vapiData.analysis?.structuredData ?? {}) as Record<string, unknown>;
+  let structured = (vapiData.analysis?.structuredData ?? {}) as Record<string, unknown>;
+
+  // VAPI Structured Outputs are NOT sent in webhooks — extract via OpenAI
+  if (Object.keys(structured).length === 0 && (vapiData.summary || vapiData.transcript)) {
+    structured = await extractStructuredDataWithAI(vapiData.summary || "", vapiData.transcript || "");
+    logger.info({ extractedData: structured }, "OpenAI extracted structured data from call");
+  }
+
   const outcome = mapVapiOutcome(vapiData.analysis?.successEvaluation, structured);
 
   logger.info({
@@ -306,6 +313,78 @@ async function triggerN8NSms(data: Record<string, unknown>) {
 
 export async function getAssistants() {
   return vapiClient.listAssistants();
+}
+
+// ─── OpenAI structured data extraction ────────────────────────────────────────
+
+async function extractStructuredDataWithAI(
+  summary: string,
+  transcript: string,
+): Promise<Record<string, unknown>> {
+  if (!env.OPENAI_API_KEY) {
+    logger.warn("OPENAI_API_KEY not set — skipping AI extraction");
+    return {};
+  }
+
+  const text = summary
+    ? `CALL SUMMARY:\n${summary}\n\nTRANSCRIPT:\n${transcript.slice(0, 3000)}`
+    : `TRANSCRIPT:\n${transcript.slice(0, 4000)}`;
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `You extract structured data from cleaning service phone calls. Return a JSON object with these fields (omit any field not mentioned in the conversation):
+- firstName (string): caller's first name
+- lastName (string): caller's last name
+- address (string): property street address
+- city (string): property city
+- state (string): state abbreviation (GA, TX, MA, FL)
+- zipCode (string): zip code
+- propertyType (string): house, apartment, condo, or office
+- bedrooms (integer): number of bedrooms
+- bathrooms (integer): number of bathrooms
+- sqft (integer): approximate square footage
+- isOccupied (boolean): whether property is occupied
+- conditionLevel (string): light, moderate, or heavy
+- serviceType (string): standard_cleaning, deep_cleaning, recurring, move_in, move_out, or post_construction
+- frequency (string): one_time, weekly, bi_weekly, or monthly
+- preferredSchedule (string): preferred days/time
+- outcome (string): interested, scheduled, deposit_requested, callback, not_interested, or voicemail
+- notes (string): any additional notes or special requests
+
+For outcome: if the caller provided their name and property details and expressed interest, use "interested". If they scheduled, use "scheduled". If the call was cut short or they declined, use "not_interested".`,
+          },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      logger.error({ status: res.status }, "OpenAI API error");
+      return {};
+    }
+
+    const json = await res.json() as any;
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) return {};
+
+    const parsed = JSON.parse(content);
+    return parsed;
+  } catch (error) {
+    logger.error({ error }, "Failed to extract structured data with OpenAI");
+    return {};
+  }
 }
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
