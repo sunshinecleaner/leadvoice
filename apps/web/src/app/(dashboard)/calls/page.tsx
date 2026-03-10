@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Phone, PhoneOff, PhoneForwarded, Clock } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatDate, formatDuration } from "@/lib/utils";
+import type { PaginatedResponse } from "@leadvoice/shared";
 
 interface Call {
   id: string;
@@ -16,42 +18,47 @@ interface Call {
   direction: string;
   duration: number | null;
   outcome: string | null;
+  summary: string | null;
   createdAt: string;
   lead: { id: string; firstName: string; lastName: string; phone: string };
 }
 
-const statusIcons: Record<string, typeof Phone> = {
-  COMPLETED: Phone,
-  FAILED: PhoneOff,
-  TRANSFERRED: PhoneForwarded,
-  IN_PROGRESS: Clock,
-};
-
 const outcomeColors: Record<string, "success" | "destructive" | "warning" | "default"> = {
   INTERESTED: "success",
-  NOT_INTERESTED: "destructive",
+  SCHEDULED: "success",
+  DEPOSIT_REQUESTED: "warning",
   CALLBACK: "warning",
-  TRANSFERRED: "default",
+  NOT_INTERESTED: "destructive",
   VOICEMAIL: "default",
   ERROR: "destructive",
 };
 
 export default function CallsPage() {
   const token = useAuthStore((s) => s.token);
+  const router = useRouter();
   const [calls, setCalls] = useState<Call[]>([]);
+  const [meta, setMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
   const [loading, setLoading] = useState(true);
 
-  const fetchCalls = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await api<{ data: Call[] }>("/api/calls", { token });
-      setCalls(res.data || []);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+  const fetchCalls = useCallback(
+    async (page = 1) => {
+      if (!token) return;
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: "20" });
+        const res = await api<PaginatedResponse<Call> & { success: boolean }>(
+          `/api/calls?${params}`,
+          { token },
+        );
+        setCalls(res.data);
+        setMeta(res.meta);
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token],
+  );
 
   useEffect(() => {
     fetchCalls();
@@ -61,12 +68,7 @@ export default function CallsPage() {
     <>
       <Header
         title="Calls"
-        description="Call history and monitoring"
-        action={
-          <Button variant="outline" size="sm" onClick={() => {}}>
-            <Phone className="mr-2 h-4 w-4" /> Live Monitor
-          </Button>
-        }
+        description={`${meta.total} total calls`}
       />
       <div className="p-6">
         <Card>
@@ -76,10 +78,10 @@ export default function CallsPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium">Lead</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
                     <th className="px-4 py-3 text-left font-medium">Direction</th>
                     <th className="px-4 py-3 text-left font-medium">Duration</th>
                     <th className="px-4 py-3 text-left font-medium">Outcome</th>
+                    <th className="px-4 py-3 text-left font-medium">Summary</th>
                     <th className="px-4 py-3 text-left font-medium">Date</th>
                   </tr>
                 </thead>
@@ -93,14 +95,18 @@ export default function CallsPage() {
                   ) : calls.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                        No calls yet. Start a campaign to begin making calls.
+                        No calls yet. Calls are recorded automatically from VAPI.
                       </td>
                     </tr>
                   ) : (
                     calls.map((call) => {
-                      const Icon = statusIcons[call.status] || Phone;
+                      const DirIcon = call.direction === "INBOUND" ? PhoneIncoming : PhoneOutgoing;
                       return (
-                        <tr key={call.id} className="border-b hover:bg-muted/50">
+                        <tr
+                          key={call.id}
+                          className="border-b hover:bg-muted/50 cursor-pointer"
+                          onClick={() => router.push(`/leads/${call.lead.id}`)}
+                        >
                           <td className="px-4 py-3">
                             <div className="font-medium">
                               {call.lead.firstName} {call.lead.lastName}
@@ -108,16 +114,16 @@ export default function CallsPage() {
                             <div className="text-xs text-muted-foreground">{call.lead.phone}</div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <Icon className="h-3 w-3" />
-                              <span>{call.status}</span>
+                            <div className="flex items-center gap-1.5">
+                              <DirIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>{call.direction}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant="outline">{call.direction}</Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            {call.duration ? formatDuration(call.duration) : "-"}
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {call.duration ? formatDuration(call.duration) : "-"}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             {call.outcome ? (
@@ -128,7 +134,14 @@ export default function CallsPage() {
                               "-"
                             )}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">
+                          <td className="px-4 py-3 max-w-xs">
+                            {call.summary ? (
+                              <p className="text-muted-foreground text-xs truncate">{call.summary}</p>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">
                             {formatDate(call.createdAt)}
                           </td>
                         </tr>
@@ -140,6 +153,33 @@ export default function CallsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pagination */}
+        {meta.totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Page {meta.page} of {meta.totalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={meta.page <= 1}
+                onClick={() => fetchCalls(meta.page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={meta.page >= meta.totalPages}
+                onClick={() => fetchCalls(meta.page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

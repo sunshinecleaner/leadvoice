@@ -43,7 +43,25 @@ export async function getLeadById(id: string) {
     where: { id },
     include: {
       assignedTo: { select: { id: true, name: true, email: true } },
-      calls: { orderBy: { createdAt: "desc" }, take: 10 },
+      calls: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          direction: true,
+          status: true,
+          duration: true,
+          outcome: true,
+          summary: true,
+          transcription: true,
+          recordingUrl: true,
+          createdAt: true,
+        },
+      },
+      serviceRequests: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
       campaignLeads: {
         include: { campaign: { select: { id: true, name: true, status: true } } },
       },

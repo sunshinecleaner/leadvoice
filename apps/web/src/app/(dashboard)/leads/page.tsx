@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Upload, Search, Filter } from "lucide-react";
+import { Plus, Upload, Search, Filter, MapPin, Home, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Header } from "@/components/layout/header";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
 import { formatDate, formatPhone } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import type { PaginatedResponse } from "@leadvoice/shared";
 
 interface Lead {
@@ -18,12 +19,14 @@ interface Lead {
   lastName: string;
   phone: string;
   email: string | null;
-  company: string | null;
   source: string;
   status: string;
-  score: number;
+  crmStage: string;
+  city: string | null;
+  state: string | null;
+  propertyType: string | null;
+  tags: string[];
   createdAt: string;
-  assignedTo: { id: string; name: string; email: string } | null;
 }
 
 const statusColors: Record<string, "default" | "secondary" | "success" | "warning" | "destructive"> = {
@@ -34,8 +37,34 @@ const statusColors: Record<string, "default" | "secondary" | "success" | "warnin
   LOST: "destructive",
 };
 
+const crmStageLabels: Record<string, string> = {
+  LEAD_NEW: "New Lead",
+  LEAD_NO_PHONE: "No Phone",
+  LEAD_QUALIFIED: "Qualified",
+  CHECKLIST_SENT: "Checklist Sent",
+  SCHEDULED: "Scheduled",
+  IN_PROGRESS: "In Progress",
+  SERVICE_COMPLETED: "Completed",
+  PAYMENT_PENDING: "Payment Pending",
+  PAID: "Paid",
+  UPSELL: "Upsell",
+  REFERRAL_REQUESTED: "Referral",
+};
+
+const crmStageColors: Record<string, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+  LEAD_NEW: "default",
+  LEAD_QUALIFIED: "warning",
+  SCHEDULED: "success",
+  CHECKLIST_SENT: "secondary",
+  IN_PROGRESS: "warning",
+  SERVICE_COMPLETED: "success",
+  PAYMENT_PENDING: "destructive",
+  PAID: "success",
+};
+
 export default function LeadsPage() {
   const token = useAuthStore((s) => s.token);
+  const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, limit: 20, totalPages: 0 });
   const [search, setSearch] = useState("");
@@ -88,7 +117,7 @@ export default function LeadsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search leads by name, email, phone..."
+              placeholder="Search leads by name, phone, city..."
               className="pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -109,44 +138,87 @@ export default function LeadsPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-3 text-left font-medium">Name</th>
                     <th className="px-4 py-3 text-left font-medium">Phone</th>
-                    <th className="px-4 py-3 text-left font-medium">Email</th>
-                    <th className="px-4 py-3 text-left font-medium">Company</th>
+                    <th className="px-4 py-3 text-left font-medium">Location</th>
+                    <th className="px-4 py-3 text-left font-medium">Property</th>
                     <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th className="px-4 py-3 text-left font-medium">CRM Stage</th>
                     <th className="px-4 py-3 text-left font-medium">Source</th>
-                    <th className="px-4 py-3 text-left font-medium">Score</th>
                     <th className="px-4 py-3 text-left font-medium">Created</th>
+                    <th className="px-4 py-3 text-left font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                         Loading...
                       </td>
                     </tr>
                   ) : leads.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                        No leads found. Import a CSV or add leads manually.
+                      <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                        No leads found. Leads are created automatically from inbound calls.
                       </td>
                     </tr>
                   ) : (
                     leads.map((lead) => (
-                      <tr key={lead.id} className="border-b hover:bg-muted/50 cursor-pointer">
-                        <td className="px-4 py-3 font-medium">
-                          {lead.firstName} {lead.lastName}
+                      <tr
+                        key={lead.id}
+                        className="border-b hover:bg-muted/50 cursor-pointer"
+                        onClick={() => router.push(`/leads/${lead.id}`)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="font-medium">
+                            {lead.firstName} {lead.lastName}
+                          </div>
+                          {lead.tags.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {lead.tags.slice(0, 2).map((tag) => (
+                                <span key={tag} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">{formatPhone(lead.phone)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{lead.email || "-"}</td>
-                        <td className="px-4 py-3">{lead.company || "-"}</td>
+                        <td className="px-4 py-3">
+                          {lead.city || lead.state ? (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{[lead.city, lead.state].filter(Boolean).join(", ")}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {lead.propertyType ? (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Home className="h-3 w-3" />
+                              <span className="capitalize">{lead.propertyType.toLowerCase()}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge variant={statusColors[lead.status] || "default"}>{lead.status}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant="outline">{lead.source}</Badge>
+                          <Badge variant={crmStageColors[lead.crmStage] || "default"}>
+                            {crmStageLabels[lead.crmStage] || lead.crmStage}
+                          </Badge>
                         </td>
-                        <td className="px-4 py-3">{lead.score}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatDate(lead.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline">{lead.source.replace(/_/g, " ")}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">
+                          {formatDate(lead.createdAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        </td>
                       </tr>
                     ))
                   )}

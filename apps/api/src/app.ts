@@ -14,6 +14,7 @@ import { vapiToolsRoutes } from "./modules/vapi/vapi.tools.js";
 import { webhooksRoutes } from "./modules/webhooks/webhooks.routes.js";
 import { integrationsRoutes } from "./modules/integrations/integrations.routes.js";
 import { smsRoutes } from "./modules/sms/sms.routes.js";
+import { callsRoutes } from "./modules/calls/calls.routes.js";
 import formbody from "@fastify/formbody";
 
 export async function buildApp() {
@@ -56,11 +57,13 @@ export async function buildApp() {
       });
     }
 
-    if (error.validation) {
+    const fastifyError = error as { validation?: unknown; message?: string };
+
+    if (fastifyError.validation) {
       return reply.status(400).send({
         success: false,
         error: "Validation error",
-        message: error.message,
+        message: fastifyError.message,
       });
     }
 
@@ -68,7 +71,6 @@ export async function buildApp() {
     return reply.status(500).send({
       success: false,
       error: "Internal server error",
-      debug: error.message,
     });
   });
 
@@ -89,6 +91,7 @@ export async function buildApp() {
   await app.register(webhooksRoutes, { prefix: "/api/webhooks" });
   await app.register(integrationsRoutes, { prefix: "/api/integrations" });
   await app.register(smsRoutes, { prefix: "/api/messages" });
+  await app.register(callsRoutes, { prefix: "/api/calls" });
 
   return app;
 }
