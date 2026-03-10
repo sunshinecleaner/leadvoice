@@ -30,6 +30,24 @@ interface Message {
   lead: Lead | null;
 }
 
+const messageTemplates = [
+  { id: "first-contact", label: "First contact — lead left message", body: `Hello, I hope you're doing well. Thank you for reaching out to Sunshine. I noticed your message regarding our cleaning services and I'll be sending you the checklist and pricing details shortly.\nIf you have any questions, feel free to reach out. I'm happy to help.` },
+  { id: "request-phone", label: "Request phone number", body: `Hello! Could you please share your phone number so we can communicate more easily? Thank you.` },
+  { id: "all-info-received", label: "All information received", body: `Hello, thank you for your message. I received all the details regarding your cleaning request and will be sending the checklist and full information shortly.\nIf you have any questions, please don't hesitate to reach out. I look forward to hearing from you.` },
+  { id: "continue-sms", label: "Continue via SMS", body: `Hello! Yes, of course. I'll continue our communication via text message on your phone number for better and faster assistance.` },
+  { id: "missed-call", label: "Missed call — collect info", body: `Hi! Thank you for your call.\nCould you please let me know if the space is a house, apartment, or office, along with the square footage or number of bedrooms and bathrooms?\nAlso, are you looking for a deep cleaning, a one-time standard cleaning, or a recurring service (bi-weekly or monthly)?\nI look forward to your response.` },
+  { id: "payment-no-deposit", label: "Payment info (no deposit)", body: `Sunshine accepts payment via Zelle, Venmo, or Cash App.\nPlease note that payment is made only after the service is completed.\nWhich method works best for you?` },
+  { id: "service-finished", label: "Service finished", body: `Hello! My team has just finished the service. I truly hope you're happy with the cleaning and that everything met your expectations.` },
+  { id: "checklist-confirmed", label: "Checklist confirmed with team", body: `Just to keep you informed, my team has been fully briefed and is completely aligned with the checklist and all service details exactly as discussed.\nEverything will be completed with care and attention to detail.\nThank you for your trust.` },
+  { id: "payment-followup", label: "Payment follow-up", body: `Hello, I hope you're doing well. I just wanted to kindly follow up to check if the payment has been processed, as I haven't received it yet.\nThank you for your time. I appreciate it.` },
+  { id: "payment-deep", label: "Payment — Deep Cleaning (deposit)", body: `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App.\n\nTo secure your appointment, a $150 deposit is required due to high demand. This deposit reserves your date and is non-negotiable.\nThe remaining balance is due upon completion of the service.\n\nCancellations must be made at least 2 days in advance for a full refund. We're happy to assist with rescheduling if needed.\nThank you for your understanding.` },
+  { id: "payment-first-regular", label: "Payment — First regular cleaning", body: `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App. Which option works best for you?\n\nPlease note that a $100 cancellation fee applies if the service is canceled within 2 days of the scheduled date. This fee is waived if the service is rescheduled at least 2 days in advance.\nThank you for your understanding.` },
+  { id: "payment-info-fixed", label: "Payment details (Venmo/Zelle/PayPal)", body: `Venmo: @sunshinebrazilian\nZelle: sunshinebrazilian@hotmail.com\nPayPal: Sunshine WL Brazilian – sunshine15` },
+  { id: "recommend-recurring", label: "Recommend recurring service", body: `I kindly recommend maintaining a regular cleaning schedule at least once a month. This helps preserve the cleanliness of your home and contributes to a healthier living environment.` },
+  { id: "thank-you", label: "Thank you (institutional)", body: `Thank you for reaching out and for your interest in Sunshine. We truly appreciate the opportunity to serve you.` },
+  { id: "referral-request", label: "Referral request", body: `Hi! I hope you're doing well.\nThank you for choosing Sunshine and being part of our journey. If you're happy with our service, I would truly appreciate your recommendation to friends, family, neighbors, or even on your Facebook page.\nGod bless you and your family.\nWarm regards,\nWelica Nunes` },
+];
+
 const statusColors: Record<string, string> = {
   SENT: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   DELIVERED: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -151,9 +169,22 @@ export default function MessagesPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Message</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value=""
+                  onChange={(e) => {
+                    const tpl = messageTemplates.find((t) => t.id === e.target.value);
+                    if (tpl) setMessageBody(tpl.body);
+                  }}
+                >
+                  <option value="">Use a template...</option>
+                  {messageTemplates.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>{tpl.label}</option>
+                  ))}
+                </select>
                 <textarea
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-none"
-                  placeholder="Type your message..."
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[120px] resize-none"
+                  placeholder="Type your message or select a template above..."
                   value={messageBody}
                   onChange={(e) => setMessageBody(e.target.value)}
                   maxLength={1600}

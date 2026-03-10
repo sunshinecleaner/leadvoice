@@ -207,9 +207,9 @@ export async function processCallCompleted(
 
   await triggerN8N("call_completed", n8nPayload);
 
-  // Send automatic SMS to qualified leads
-  const qualifiedOutcomes = ["INTERESTED", "SCHEDULED", "DEPOSIT_REQUESTED"];
-  if (qualifiedOutcomes.includes(outcome)) {
+  // Send automatic SMS based on call outcome
+  const smsOutcomes = ["INTERESTED", "SCHEDULED", "DEPOSIT_REQUESTED", "VOICEMAIL"];
+  if (smsOutcomes.includes(outcome)) {
     await sendAutoSmsToLead(call.leadId, outcome, structured);
     await triggerN8NSms(n8nPayload);
   }
@@ -326,23 +326,30 @@ async function sendAutoSmsToLead(
       return;
     }
 
-    const firstName = structured.firstName || lead.firstName || "";
-    const serviceType = structured.serviceType
-      ? String(structured.serviceType).replace(/_/g, " ").toLowerCase()
-      : "cleaning service";
+    const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
+    const isDeepCleaning = String(structured.serviceType || "").toLowerCase().includes("deep");
 
     let message = "";
 
-    if (outcome === "SCHEDULED") {
-      message = `Hi ${firstName}! Thank you for scheduling with Sunshine Cleaning. Our team will confirm your appointment details shortly. If you have any questions, feel free to text us back. We look forward to making your space shine! - Sunshine Cleaning`;
-    } else if (outcome === "DEPOSIT_REQUESTED") {
-      message = `Hi ${firstName}! Thank you for choosing Sunshine Cleaning for your ${serviceType}. To secure your appointment, a $150 deposit is required. Our manager Welica will text you shortly with payment details. Thank you! - Sunshine Cleaning`;
+    if (outcome === "VOICEMAIL") {
+      // Template #5 — Ligação não atendida
+      message = `Hi! Thank you for your call.\nCould you please let me know if the space is a house, apartment, or office, along with the square footage or number of bedrooms and bathrooms?\nAlso, are you looking for a deep cleaning, a one-time standard cleaning, or a recurring service (bi-weekly or monthly)?\nI look forward to your response.`;
+    } else if (outcome === "DEPOSIT_REQUESTED" || (outcome === "SCHEDULED" && isDeepCleaning)) {
+      // Template #10 — Deep Cleaning payment with deposit
+      message = `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App.\n\nTo secure your appointment, a $150 deposit is required due to high demand. This deposit reserves your date and is non-negotiable.\nThe remaining balance is due upon completion of the service.\n\nCancellations must be made at least 2 days in advance for a full refund. We're happy to assist with rescheduling if needed.\nThank you for your understanding.`;
+    } else if (outcome === "SCHEDULED") {
+      // Template #11 — First regular cleaning payment
+      message = `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App. Which option works best for you?\n\nPlease note that a $100 cancellation fee applies if the service is canceled within 2 days of the scheduled date. This fee is waived if the service is rescheduled at least 2 days in advance.\nThank you for your understanding.`;
+    } else if (hasFullDetails) {
+      // Template #3 — Client sent all information
+      message = `Hello, thank you for your message. I received all the details regarding your cleaning request and will be sending the checklist and full information shortly.\nIf you have any questions, please don't hesitate to reach out. I look forward to hearing from you.`;
     } else {
-      message = `Hi ${firstName}! Thank you for speaking with us at Sunshine Cleaning. We're preparing your custom ${serviceType} quote and will send it to you shortly. If you have any questions, just text us back! - Sunshine Cleaning`;
+      // Template #1 — First contact, lead left message
+      message = `Hello, I hope you're doing well. Thank you for reaching out to Sunshine. I noticed your message regarding our cleaning services and I'll be sending you the checklist and pricing details shortly.\nIf you have any questions, feel free to reach out. I'm happy to help.`;
     }
 
     await smsService.sendMessage({ leadId, body: message });
-    logger.info({ leadId, outcome }, "Auto SMS sent to qualified lead");
+    logger.info({ leadId, outcome, hasFullDetails }, "Auto SMS sent to lead");
   } catch (error) {
     logger.error({ error, leadId }, "Failed to send auto SMS to lead");
   }
