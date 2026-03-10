@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { logger } from "../../lib/logger.js";
 import * as vapiService from "../vapi/vapi.service.js";
+import * as smsService from "../sms/sms.service.js";
 import { prisma } from "@leadvoice/database";
 
 export async function webhooksRoutes(app: FastifyInstance) {
@@ -163,6 +164,25 @@ export async function webhooksRoutes(app: FastifyInstance) {
       default:
         return reply.status(400).send({ success: false, error: `Unknown action: ${body.action}` });
     }
+  });
+
+  // ─── Twilio SMS webhook ─────────────────────────────────────────────────────
+  app.post("/twilio/sms", async (request, reply) => {
+    const body = request.body as Record<string, string>;
+    const { From, To, Body, MessageSid } = body;
+
+    if (!From || !Body || !MessageSid) {
+      logger.warn({ body }, "Invalid Twilio SMS webhook payload");
+      return reply.status(400).send({ success: false, error: "Missing required fields" });
+    }
+
+    logger.info({ from: From, to: To, sid: MessageSid }, "Twilio inbound SMS webhook");
+
+    await smsService.processInboundSms({ From, To: To || "", Body, MessageSid });
+
+    // Twilio expects TwiML response — empty response means no auto-reply
+    reply.type("text/xml");
+    return reply.send("<Response></Response>");
   });
 
   // ─── Generic inbound webhook ─────────────────────────────────────────────────

@@ -12,6 +12,8 @@ import { dashboardRoutes, dashboardPublicRoutes } from "./modules/dashboard/dash
 import { vapiRoutes } from "./modules/vapi/vapi.routes.js";
 import { webhooksRoutes } from "./modules/webhooks/webhooks.routes.js";
 import { integrationsRoutes } from "./modules/integrations/integrations.routes.js";
+import { smsRoutes } from "./modules/sms/sms.routes.js";
+import formbody from "@fastify/formbody";
 
 export async function buildApp() {
   const app = Fastify({
@@ -32,6 +34,8 @@ export async function buildApp() {
   await app.register(multipart, {
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   });
+
+  await app.register(formbody);
 
   // Decorators
   app.decorate("authenticate", async function (request: any, reply: any) {
@@ -82,6 +86,7 @@ export async function buildApp() {
   await app.register(vapiRoutes, { prefix: "/api/vapi" });
   await app.register(webhooksRoutes, { prefix: "/api/webhooks" });
   await app.register(integrationsRoutes, { prefix: "/api/integrations" });
+  await app.register(smsRoutes, { prefix: "/api/messages" });
 
   return app;
 }

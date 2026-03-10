@@ -7,8 +7,8 @@ import {
   Users,
   Megaphone,
   Phone,
+  MessageSquare,
   BarChart3,
-
   Settings,
   LogOut,
 } from "lucide-react";
@@ -21,6 +21,7 @@ const navItems = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/calls", label: "Calls", icon: Phone },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

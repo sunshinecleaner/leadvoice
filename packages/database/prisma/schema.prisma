@@ -147,6 +147,21 @@ enum CallOutcome {
   ERROR
 }
 
+// ─── Messages (SMS) ──────────────────────────────────────────────────────────
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  RECEIVED
+}
+
 // ─── Integrations ─────────────────────────────────────────────────────────────
 
 enum IntegrationType {
@@ -219,6 +234,7 @@ model Lead {
   campaignLeads   CampaignLead[]
   calls           Call[]
   serviceRequests ServiceRequest[]
+  messages        Message[]
 
   @@index([status])
   @@index([crmStage])
@@ -343,6 +359,27 @@ model CallEvent {
 
   @@index([callId])
   @@map("call_events")
+}
+
+model Message {
+  id           String           @id @default(cuid())
+  leadId       String?
+  lead         Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  direction    MessageDirection
+  status       MessageStatus    @default(QUEUED)
+  from         String
+  to           String
+  body         String           @db.Text
+  twilioSid    String?          @unique
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([leadId])
+  @@index([direction])
+  @@index([status])
+  @@index([twilioSid])
+  @@map("messages")
 }
 
 model Integration {
