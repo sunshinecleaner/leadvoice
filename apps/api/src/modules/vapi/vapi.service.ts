@@ -1,6 +1,7 @@
 import { prisma, CallStatus, CallDirection, LeadStatus } from "@leadvoice/database";
 import * as vapiClient from "./vapi.client.js";
 import * as smsService from "../sms/sms.service.js";
+import { sendEmail } from "../../lib/email.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 
@@ -322,6 +323,33 @@ async function sendAutoSmsToLead(
 
     await smsService.sendMessage({ leadId, body: message });
     logger.info({ leadId, outcome }, "Auto SMS sent to qualified lead");
+
+    // Notify Welica by email
+    if (env.NOTIFICATION_EMAIL) {
+      const leadName = `${firstName} ${structured.lastName || lead.lastName || ""}`.trim();
+      const phone = lead.phone;
+      const city = structured.city || lead.city || "Unknown";
+      const state = structured.state || lead.state || "";
+
+      await sendEmail({
+        to: env.NOTIFICATION_EMAIL,
+        subject: `New Qualified Lead: ${leadName} — ${outcome}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px;">
+            <h2 style="color: #f59e0b;">New Qualified Lead</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr><td style="padding: 8px; font-weight: bold;">Name</td><td style="padding: 8px;">${leadName}</td></tr>
+              <tr style="background: #f9fafb;"><td style="padding: 8px; font-weight: bold;">Phone</td><td style="padding: 8px;">${phone}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Location</td><td style="padding: 8px;">${city}, ${state}</td></tr>
+              <tr style="background: #f9fafb;"><td style="padding: 8px; font-weight: bold;">Service</td><td style="padding: 8px;">${serviceType}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold;">Outcome</td><td style="padding: 8px; color: #16a34a; font-weight: bold;">${outcome}</td></tr>
+            </table>
+            <p style="margin-top: 16px; color: #6b7280;">An SMS has been automatically sent to the lead. Review the full details in <a href="https://sunshine-leadvoice-web.lxlgch.easypanel.host/leads">LeadVoice Dashboard</a>.</p>
+            <p style="color: #9ca3af; font-size: 12px;">— SunnyBee AI</p>
+          </div>
+        `,
+      });
+    }
   } catch (error) {
     logger.error({ error, leadId }, "Failed to send auto SMS to lead");
   }
