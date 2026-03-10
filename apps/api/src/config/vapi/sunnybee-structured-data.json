@@ -21,7 +21,7 @@
     },
     "state": {
       "type": "string",
-      "description": "Property state abbreviation (GA, TX, MA, FL)"
+      "description": "Property state abbreviation (GA, FL, TX, NY, MA)"
     },
     "zipCode": {
       "type": "string",
