@@ -32,6 +32,17 @@ const SERVICE_AREAS: Record<string, string[]> = {
     "336", "337", "338", "339",               // Tampa / Gulf Coast
     "340", "341", "342", "344", "346", "347", // West FL
   ],
+  // New York — NYC, Long Island, Westchester, Hudson Valley
+  NY: [
+    "100", "101", "102", "103", "104", "105", // Manhattan / Bronx
+    "106", "107", "108", "109",               // Westchester
+    "110", "111", "112", "113", "114", "115", // Queens / Brooklyn / Long Island
+    "116", "117", "118", "119",               // Long Island
+    "120", "121", "122", "123", "124", "125", // Albany / Hudson Valley
+    "126", "127", "128", "129",               // Upstate NY
+    "130", "131", "132", "133", "134", "135", // Syracuse / Central NY
+    "140", "141", "142", "143", "144", "145", // Buffalo / Western NY
+  ],
 };
 
 // Flatten all prefixes for quick lookup
@@ -64,7 +75,7 @@ function validateZipCode(zipCode: string): { serviceable: boolean; state?: strin
 
   return {
     serviceable: false,
-    message: "Unfortunately, we don't currently service that area. We operate in Georgia, Texas, Massachusetts, and Florida.",
+    message: "Unfortunately, we don't currently service that area. We operate in Georgia, Florida, Texas, New York, and Massachusetts.",
   };
 }
 
