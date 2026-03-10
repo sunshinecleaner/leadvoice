@@ -24,4 +24,5 @@ FROM base AS runner
 ENV NODE_ENV=production
 COPY --from=builder /app .
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@leadvoice/api", "dev"]
+# Run migrations then start API
+CMD pnpm --filter @leadvoice/database exec prisma migrate deploy && pnpm --filter @leadvoice/api dev

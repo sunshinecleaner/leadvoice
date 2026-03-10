@@ -125,9 +125,9 @@ export async function processCallCompleted(
     call = await prisma.call.findFirst({ where: { twilioCallSid: vapiCallId } });
   }
 
-  // For calls that started without being tracked (inbound or test calls)
+  // For calls that started without being tracked (dashboard test calls, or missed call-started event)
   if (!call) {
-    const phone = vapiData.customerPhone || "test-call";
+    const phone = vapiData.customerPhone || "unknown";
     logger.info({ vapiCallId, phone }, "Creating call record for untracked call");
     const result = await processInboundCallStarted(vapiCallId, phone);
     call = result.call;
@@ -227,23 +227,26 @@ async function updateLeadFromStructuredData(
 ) {
   const crmStage = mapOutcomeToCrmStage(outcome, data);
 
+  // Helper: only include field if value is truthy and not null
+  const has = (v: unknown): v is string | number | boolean => v !== null && v !== undefined && v !== "";
+
   await (prisma.lead.update as any)({
     where: { id: leadId },
     data: {
-      ...(data.firstName ? { firstName: String(data.firstName) } : {}),
-      ...(data.lastName ? { lastName: String(data.lastName) } : {}),
-      ...(data.address ? { address: String(data.address) } : {}),
-      ...(data.city ? { city: String(data.city) } : {}),
-      ...(data.state ? { state: String(data.state) } : {}),
-      ...(data.zipCode ? { zipCode: String(data.zipCode) } : {}),
-      ...(data.propertyType ? { propertyType: mapPropertyType(String(data.propertyType)) } : {}),
-      ...(data.bedrooms ? { bedrooms: Number(data.bedrooms) } : {}),
-      ...(data.bathrooms ? { bathrooms: Number(data.bathrooms) } : {}),
-      ...(data.sqft ? { sqft: Number(data.sqft) } : {}),
-      ...(data.isOccupied !== undefined ? { isOccupied: Boolean(data.isOccupied) } : {}),
-      ...(data.conditionLevel ? { conditionLevel: mapConditionLevel(String(data.conditionLevel)) } : {}),
-      ...(data.preferredSchedule ? { preferredSchedule: String(data.preferredSchedule) } : {}),
-      ...(data.language ? { language: String(data.language).toUpperCase() === "ES" ? "ES" : "EN" } : {}),
+      ...(has(data.firstName) ? { firstName: String(data.firstName) } : {}),
+      ...(has(data.lastName) ? { lastName: String(data.lastName) } : {}),
+      ...(has(data.address) ? { address: String(data.address) } : {}),
+      ...(has(data.city) ? { city: String(data.city) } : {}),
+      ...(has(data.state) ? { state: String(data.state) } : {}),
+      ...(has(data.zipCode) ? { zipCode: String(data.zipCode) } : {}),
+      ...(has(data.propertyType) ? { propertyType: mapPropertyType(String(data.propertyType)) } : {}),
+      ...(has(data.bedrooms) ? { bedrooms: Number(data.bedrooms) } : {}),
+      ...(has(data.bathrooms) ? { bathrooms: Number(data.bathrooms) } : {}),
+      ...(has(data.sqft) ? { sqft: Number(data.sqft) } : {}),
+      ...(data.isOccupied !== undefined && data.isOccupied !== null ? { isOccupied: Boolean(data.isOccupied) } : {}),
+      ...(has(data.conditionLevel) ? { conditionLevel: mapConditionLevel(String(data.conditionLevel)) } : {}),
+      ...(has(data.preferredSchedule) ? { preferredSchedule: String(data.preferredSchedule) } : {}),
+      ...(has(data.language) ? { language: String(data.language).toUpperCase() === "ES" ? "ES" : "EN" } : {}),
       status:
         outcome === "INTERESTED" || outcome === "SCHEDULED"
           ? LeadStatus.QUALIFIED

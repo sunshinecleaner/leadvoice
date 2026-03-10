@@ -41,14 +41,15 @@ export async function webhooksRoutes(app: FastifyInstance) {
 
       // Full call report when call ends — main event
       case "end-of-call-report": {
-        // Log full payload to find where VAPI puts structured data
-        logger.info({ fullPayload: JSON.stringify(body.message).slice(0, 8000) }, "VAPI end-of-call-report FULL PAYLOAD");
-
-        const callData = body.message as unknown as {
-          call: { id: string; type?: string; customer?: { number: string } };
+        const msg = body.message as any;
+        const callData = msg as {
+          call: { id: string; type?: string; customer?: { number: string }; phoneNumber?: { number: string } };
           recordingUrl?: string;
+          stereoRecordingUrl?: string;
           transcript?: string;
           summary?: string;
+          durationSeconds?: number;
+          durationMs?: number;
           duration?: number;
           cost?: number;
           analysis?: {
@@ -56,13 +57,11 @@ export async function webhooksRoutes(app: FastifyInstance) {
             summary?: string;
             structuredData?: Record<string, unknown>;
           };
-          // VAPI may put structured outputs at different locations
           structuredData?: Record<string, unknown>;
           structuredOutputs?: Record<string, unknown>;
         };
 
         // Look for structured data in multiple possible locations
-        const msg = body.message as any;
         const structuredData =
           callData.analysis?.structuredData ||
           callData.structuredData ||
@@ -71,11 +70,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
           msg.structuredOutputs ||
           {};
 
-        // Log all top-level keys to find where VAPI puts structured data
-        logger.info({ topLevelKeys: Object.keys(msg), analysisKeys: msg.analysis ? Object.keys(msg.analysis) : [] }, "VAPI payload keys");
-
         if (callData.call?.id) {
-          // Merge structuredData into analysis if found outside
           const analysis = {
             ...callData.analysis,
             structuredData: Object.keys(structuredData).length > 0
@@ -83,15 +78,33 @@ export async function webhooksRoutes(app: FastifyInstance) {
               : callData.analysis?.structuredData,
           };
 
+          // VAPI sends durationSeconds at top level (not duration)
+          const duration = callData.durationSeconds || callData.duration || (callData.durationMs ? callData.durationMs / 1000 : 0);
+
+          // Extract customer phone from multiple possible locations
+          const customerPhone =
+            callData.call.customer?.number ||
+            callData.call.phoneNumber?.number ||
+            undefined;
+
+          logger.info({
+            vapiCallId: callData.call.id,
+            customerPhone,
+            duration,
+            hasAnalysis: !!callData.analysis,
+            hasStructuredData: Object.keys(structuredData).length > 0,
+            outcome: callData.analysis?.successEvaluation,
+          }, "Processing end-of-call-report");
+
           await vapiService.processCallCompleted(callData.call.id, {
             id: callData.call.id,
-            recordingUrl: callData.recordingUrl || "",
+            recordingUrl: callData.recordingUrl || callData.stereoRecordingUrl || "",
             transcript: callData.transcript || "",
             summary: callData.summary || "",
-            duration: callData.duration || 0,
+            duration,
             cost: callData.cost || 0,
             analysis: analysis as any,
-            customerPhone: callData.call.customer?.number,
+            customerPhone,
           } as any);
         }
         break;
