@@ -285,17 +285,29 @@ async function createServiceRequest(leadId: string, data: Record<string, unknown
 // ─── Trigger N8N ─────────────────────────────────────────────────────────────
 
 async function triggerN8N(event: string, data: Record<string, unknown>) {
-  if (!env.N8N_WEBHOOK_URL) return;
+  if (!env.N8N_WEBHOOK_URL) {
+    logger.warn("N8N_WEBHOOK_URL not set — skipping N8N trigger");
+    return;
+  }
 
   try {
-    await fetch(env.N8N_WEBHOOK_URL, {
+    const payload = { event, data, timestamp: new Date().toISOString() };
+    logger.info({ event, url: env.N8N_WEBHOOK_URL }, "Sending N8N webhook");
+
+    const res = await fetch(env.N8N_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event, data, timestamp: new Date().toISOString() }),
+      body: JSON.stringify(payload),
     });
-    logger.info({ event }, "N8N webhook triggered");
+
+    const responseText = await res.text();
+    logger.info({ event, status: res.status, response: responseText.slice(0, 500) }, "N8N webhook response");
+
+    if (!res.ok) {
+      logger.error({ event, status: res.status, response: responseText.slice(0, 500) }, "N8N webhook returned error");
+    }
   } catch (error) {
-    logger.error({ error, event }, "Failed to trigger N8N webhook");
+    logger.error({ error, event, url: env.N8N_WEBHOOK_URL }, "Failed to trigger N8N webhook");
   }
 }
 
@@ -307,6 +319,12 @@ async function sendAutoSmsToLead(
   try {
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead?.phone) return;
+
+    // Skip SMS for invalid/test phone numbers
+    if (!lead.phone.startsWith("+") || lead.phone === "unknown" || lead.phone.length < 10) {
+      logger.info({ leadId, phone: lead.phone }, "Skipping auto SMS — invalid phone number");
+      return;
+    }
 
     const firstName = structured.firstName || lead.firstName || "";
     const serviceType = structured.serviceType
@@ -331,17 +349,22 @@ async function sendAutoSmsToLead(
 }
 
 async function triggerN8NSms(data: Record<string, unknown>) {
-  if (!env.N8N_SMS_WEBHOOK_URL) return;
+  if (!env.N8N_SMS_WEBHOOK_URL) {
+    logger.warn("N8N_SMS_WEBHOOK_URL not set — skipping SMS alert");
+    return;
+  }
 
   try {
-    await fetch(env.N8N_SMS_WEBHOOK_URL, {
+    const res = await fetch(env.N8N_SMS_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event: "sms_alert", data, timestamp: new Date().toISOString() }),
     });
-    logger.info("N8N SMS webhook triggered");
+
+    const responseText = await res.text();
+    logger.info({ status: res.status, response: responseText.slice(0, 500) }, "N8N SMS webhook response");
   } catch (error) {
-    logger.error({ error }, "Failed to trigger N8N SMS webhook");
+    logger.error({ error, url: env.N8N_SMS_WEBHOOK_URL }, "Failed to trigger N8N SMS webhook");
   }
 }
 
@@ -380,26 +403,32 @@ async function extractStructuredDataWithAI(
         messages: [
           {
             role: "system",
-            content: `You extract structured data from cleaning service phone calls. Return a JSON object with these fields (omit any field not mentioned in the conversation):
-- firstName (string): caller's first name
-- lastName (string): caller's last name
-- address (string): property street address
-- city (string): property city
-- state (string): state abbreviation (GA, TX, MA, FL)
-- zipCode (string): zip code
-- propertyType (string): house, apartment, condo, or office
-- bedrooms (integer): number of bedrooms
-- bathrooms (integer): number of bathrooms
-- sqft (integer): approximate square footage
-- isOccupied (boolean): whether property is occupied
-- conditionLevel (string): light, moderate, or heavy
-- serviceType (string): standard_cleaning, deep_cleaning, recurring, move_in, move_out, or post_construction
-- frequency (string): one_time, weekly, bi_weekly, or monthly
-- preferredSchedule (string): preferred days/time
-- outcome (string): interested, scheduled, deposit_requested, callback, not_interested, or voicemail
-- notes (string): any additional notes or special requests
+            content: `You extract structured data from cleaning service phone calls. Return a JSON object with ONLY the fields that were clearly mentioned in the conversation. Use null for any field not mentioned — NEVER use empty strings.
 
-For outcome: if the caller provided their name and property details and expressed interest, use "interested". If they scheduled, use "scheduled". If the call was cut short or they declined, use "not_interested".`,
+Fields to extract:
+- firstName (string | null): caller's first name
+- lastName (string | null): caller's last name
+- address (string | null): property street address
+- city (string | null): property city
+- state (string | null): state abbreviation (GA, TX, MA, FL, NY)
+- zipCode (string | null): zip code
+- propertyType (string | null): house, apartment, condo, or office
+- bedrooms (integer | null): number of bedrooms
+- bathrooms (integer | null): number of bathrooms
+- sqft (integer | null): approximate square footage
+- isOccupied (boolean | null): whether property is occupied
+- conditionLevel (string | null): light, moderate, or heavy
+- serviceType (string | null): standard_cleaning, deep_cleaning, recurring, move_in, move_out, or post_construction
+- frequency (string | null): one_time, weekly, bi_weekly, or monthly
+- preferredSchedule (string | null): preferred days/time
+- outcome (string): interested, scheduled, deposit_requested, callback, not_interested, or voicemail
+- notes (string | null): any additional notes or special requests
+
+IMPORTANT RULES:
+1. If the caller did NOT provide their name, set firstName and lastName to null (not "").
+2. Use the EXACT numbers the caller stated (don't change 2 bedrooms to 3).
+3. For outcome: "interested" if caller engaged and provided property details. "not_interested" if they declined or hung up quickly. "voicemail" if no live conversation.
+4. Always include the outcome field — it is required.`,
           },
           { role: "user", content: text },
         ],
