@@ -1,5 +1,6 @@
 import { prisma, CallStatus, CallDirection, LeadStatus } from "@leadvoice/database";
 import * as vapiClient from "./vapi.client.js";
+import * as smsService from "../sms/sms.service.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 
@@ -206,9 +207,10 @@ export async function processCallCompleted(
 
   await triggerN8N("call_completed", n8nPayload);
 
-  // Send SMS alert for qualified leads
+  // Send automatic SMS to qualified leads
   const qualifiedOutcomes = ["INTERESTED", "SCHEDULED", "DEPOSIT_REQUESTED"];
   if (qualifiedOutcomes.includes(outcome)) {
+    await sendAutoSmsToLead(call.leadId, outcome, structured);
     await triggerN8NSms(n8nPayload);
   }
 
@@ -291,6 +293,37 @@ async function triggerN8N(event: string, data: Record<string, unknown>) {
     logger.info({ event }, "N8N webhook triggered");
   } catch (error) {
     logger.error({ error, event }, "Failed to trigger N8N webhook");
+  }
+}
+
+async function sendAutoSmsToLead(
+  leadId: string,
+  outcome: string,
+  structured: Record<string, unknown>,
+) {
+  try {
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead?.phone) return;
+
+    const firstName = structured.firstName || lead.firstName || "";
+    const serviceType = structured.serviceType
+      ? String(structured.serviceType).replace(/_/g, " ").toLowerCase()
+      : "cleaning service";
+
+    let message = "";
+
+    if (outcome === "SCHEDULED") {
+      message = `Hi ${firstName}! Thank you for scheduling with Sunshine Cleaning. Our team will confirm your appointment details shortly. If you have any questions, feel free to text us back. We look forward to making your space shine! - Sunshine Cleaning`;
+    } else if (outcome === "DEPOSIT_REQUESTED") {
+      message = `Hi ${firstName}! Thank you for choosing Sunshine Cleaning for your ${serviceType}. To secure your appointment, a $150 deposit is required. Our manager Welica will text you shortly with payment details. Thank you! - Sunshine Cleaning`;
+    } else {
+      message = `Hi ${firstName}! Thank you for speaking with us at Sunshine Cleaning. We're preparing your custom ${serviceType} quote and will send it to you shortly. If you have any questions, just text us back! - Sunshine Cleaning`;
+    }
+
+    await smsService.sendMessage({ leadId, body: message });
+    logger.info({ leadId, outcome }, "Auto SMS sent to qualified lead");
+  } catch (error) {
+    logger.error({ error, leadId }, "Failed to send auto SMS to lead");
   }
 }
 
