@@ -12,16 +12,17 @@ function getTwilioClient() {
   return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
 }
 
-// Template → CRM tag + stage mapping (client spec)
-const templateTagMap: Record<string, { tag: string; crmStage?: string }> = {
-  "checklist-confirmed":   { tag: "team-briefed", crmStage: "IN_PROGRESS" },
-  "service-finished":      { tag: "service-completed", crmStage: "SERVICE_COMPLETED" },
-  "payment-followup":      { tag: "payment-pending", crmStage: "PAYMENT_PENDING" },
-  "payment-deep":          { tag: "deposit-required", crmStage: "CHECKLIST_SENT" },
-  "payment-first-regular": { tag: "payment-after-service", crmStage: "SCHEDULED" },
-  "payment-no-deposit":    { tag: "payment-after-service" },
-  "recommend-recurring":   { tag: "upsell-regular", crmStage: "PAID" },
-  "referral-request":      { tag: "referral-request", crmStage: "PAID" },
+// Template → CRM tags + stage mapping (client FLUXTECHNO spec)
+const templateTagMap: Record<string, { tags: string[]; crmStage?: string }> = {
+  "checklist-confirmed":   { tags: ["scheduled", "team-briefed"], crmStage: "IN_PROGRESS" },
+  "service-finished":      { tags: ["service-completed"], crmStage: "SERVICE_COMPLETED" },
+  "payment-followup":      { tags: ["payment-pending"], crmStage: "PAYMENT_PENDING" },
+  "payment-deep":          { tags: ["deep-cleaning", "deposit-required"], crmStage: "CHECKLIST_SENT" },
+  "payment-first-regular": { tags: ["payment-after-service"], crmStage: "SCHEDULED" },
+  "payment-no-deposit":    { tags: ["payment-after-service"] },
+  "recommend-recurring":   { tags: ["upsell-regular"], crmStage: "PAID" },
+  "referral-request":      { tags: ["referral-request"], crmStage: "PAID" },
+  "thank-you":             { tags: ["paid"], crmStage: "PAID" },
 };
 
 export async function sendMessage(input: SendMessageInput) {
@@ -62,11 +63,11 @@ export async function sendMessage(input: SendMessageInput) {
       include: { lead: { select: { id: true, firstName: true, lastName: true, phone: true } } },
     });
 
-    // Apply CRM tag + advance stage when sending a template message
+    // Apply CRM tags + advance stage when sending a template message
     if (input.templateId && templateTagMap[input.templateId]) {
       const mapping = templateTagMap[input.templateId];
       const currentTags = (lead.tags as string[]) || [];
-      const newTags = currentTags.includes(mapping.tag) ? currentTags : [...currentTags, mapping.tag];
+      const newTags = [...new Set([...currentTags, ...mapping.tags])];
 
       await (prisma.lead.update as any)({
         where: { id: lead.id },
@@ -75,7 +76,7 @@ export async function sendMessage(input: SendMessageInput) {
           ...(mapping.crmStage ? { crmStage: mapping.crmStage } : {}),
         },
       });
-      logger.info({ leadId: lead.id, templateId: input.templateId, tag: mapping.tag, crmStage: mapping.crmStage }, "CRM tag applied via template");
+      logger.info({ leadId: lead.id, templateId: input.templateId, tags: mapping.tags, crmStage: mapping.crmStage }, "CRM tags applied via template");
     }
 
     logger.info({ messageId: updated.id, twilioSid: twilioMsg.sid, to: lead.phone }, "SMS sent");

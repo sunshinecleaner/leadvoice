@@ -332,20 +332,20 @@ async function sendAutoSmsToLead(
     let message = "";
 
     if (outcome === "VOICEMAIL") {
-      // Template #5 — Ligação não atendida
+      // Missed call — collect property info
       message = `Hi! Thank you for your call.\nCould you please let me know if the space is a house, apartment, or office, along with the square footage or number of bedrooms and bathrooms?\nAlso, are you looking for a deep cleaning, a one-time standard cleaning, or a recurring service (bi-weekly or monthly)?\nI look forward to your response.`;
     } else if (outcome === "DEPOSIT_REQUESTED" || (outcome === "SCHEDULED" && isDeepCleaning)) {
-      // Template #10 — Deep Cleaning payment with deposit
+      // Deep Cleaning — deposit required
       message = `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App.\n\nTo secure your appointment, a $150 deposit is required due to high demand. This deposit reserves your date and is non-negotiable.\nThe remaining balance is due upon completion of the service.\n\nCancellations must be made at least 2 days in advance for a full refund. We're happy to assist with rescheduling if needed.\nThank you for your understanding.`;
     } else if (outcome === "SCHEDULED") {
-      // Template #11 — First regular cleaning payment
+      // Regular cleaning — payment after service
       message = `Sunshine – Payment Information\nWe accept Zelle, Venmo, or Cash App. Which option works best for you?\n\nPlease note that a $100 cancellation fee applies if the service is canceled within 2 days of the scheduled date. This fee is waived if the service is rescheduled at least 2 days in advance.\nThank you for your understanding.`;
     } else if (hasFullDetails) {
-      // Template #3 — Client sent all information
-      message = `Hello, thank you for your message. I received all the details regarding your cleaning request and will be sending the checklist and full information shortly.\nIf you have any questions, please don't hesitate to reach out. I look forward to hearing from you.`;
+      // All info received — pre-quote confirmation
+      message = `Perfect. Thank you for the information.\n\nBased on what you described, I'll prepare your detailed estimate and checklist.\n\nPlease note:\n• For deep cleaning, a deposit is required to secure the appointment due to high demand.\n• Cancellations must be made at least 2 days in advance to avoid fees.\n• Final pricing reflects the actual scope and condition of the property.\n\nI'll send everything shortly.`;
     } else {
-      // Template #1 — First contact, lead left message
-      message = `Hello, I hope you're doing well. Thank you for reaching out to Sunshine. I noticed your message regarding our cleaning services and I'll be sending you the checklist and pricing details shortly.\nIf you have any questions, feel free to reach out. I'm happy to help.`;
+      // First contact — full qualification questions
+      message = `Hello! Thank you for reaching out to Sunshine.\nI'd be happy to assist you and prepare an accurate quote.\n\nTo make sure we allocate the proper team size, time, and pricing, could you please confirm a few details:\n\n• House, apartment, or office?\n• How many bedrooms and bathrooms?\n• Approximate square footage?\n• Is the property occupied or vacant?\n• Is this move-in, move-out, post-construction, or regular cleaning?\n\nService type:\n• One-time standard cleaning\n• Deep cleaning\n• Recurring service (bi-weekly or monthly)\n\nHow would you describe the condition?\n1. Lightly maintained (routine buildup)\n2. Moderate buildup (visible dirt in kitchen/bathrooms)\n3. Heavily soiled (strong buildup, grease, stains)\n\nOnce I receive this, I'll send your quote and checklist right away.`;
     }
 
     await smsService.sendMessage({ leadId, body: message });
@@ -505,39 +505,39 @@ function buildTags(outcome: string, structured: Record<string, unknown>): string
   const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
   const isDeepCleaning = String(structured.serviceType || "").toLowerCase().includes("deep");
 
-  // Stage tags (client CRM spec)
-  if (outcome === "VOICEMAIL") {
-    tags.push("lead-new", "info-missing");
-  } else if (outcome === "CALLBACK") {
-    tags.push("lead-new", "callback-requested");
-  } else if (outcome === "NOT_INTERESTED") {
-    tags.push("lead-new", "not-interested");
+  // ── Lead stage tags ──
+  if (outcome === "VOICEMAIL" || outcome === "CALLBACK" || outcome === "NOT_INTERESTED") {
+    tags.push("lead-new");
   } else if (outcome === "INTERESTED" && !hasFullDetails) {
-    tags.push("lead-new", "info-missing");
+    tags.push("lead-new");
   } else if (outcome === "INTERESTED" && hasFullDetails) {
     tags.push("lead-qualified");
   } else if (outcome === "SCHEDULED") {
     tags.push("lead-qualified", "scheduled");
   } else if (outcome === "DEPOSIT_REQUESTED") {
-    tags.push("lead-qualified", "checklist-sent", "deposit-required");
+    tags.push("lead-qualified", "deposit-required");
   }
 
-  // Payment tags
+  // ── Service type tags ──
   if (isDeepCleaning) {
     tags.push("deep-cleaning", "deposit-required");
   } else if (structured.serviceType) {
     const st = String(structured.serviceType).toLowerCase();
-    if (st.includes("standard") || st.includes("recurring")) tags.push("payment-after-service");
+    if (st.includes("standard") || st.includes("move")) tags.push("standard-cleaning");
     if (st.includes("recurring")) tags.push("recurring-client");
-    if (st.includes("move")) tags.push("payment-after-service", "move-cleaning");
   }
 
-  // Channel tag — phone confirmed via call
+  // ── Financial tags ──
+  if (!isDeepCleaning && structured.serviceType) {
+    tags.push("payment-after-service");
+  }
+
+  // ── Channel tag — phone confirmed via call ──
   if (structured.firstName && structured.firstName !== "Unknown") {
     tags.push("channel-sms");
   }
 
-  return tags;
+  return [...new Set(tags)]; // deduplicate
 }
 
 function mapPropertyType(value: string): string | undefined {
