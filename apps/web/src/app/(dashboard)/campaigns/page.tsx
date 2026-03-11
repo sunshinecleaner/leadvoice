@@ -68,11 +68,9 @@ export default function CampaignsPage() {
         title="Campaigns"
         description="Manage your calling campaigns"
         action={
-          <Link href="/campaigns/new">
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" /> New Campaign
-            </Button>
-          </Link>
+          <Button size="sm" disabled title="Coming soon">
+            <Plus className="mr-2 h-4 w-4" /> New Campaign
+          </Button>
         }
       />
       <div className="p-6">
@@ -82,11 +80,9 @@ export default function CampaignsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground mb-4">No campaigns yet. Create your first campaign.</p>
-              <Link href="/campaigns/new">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" /> New Campaign
-                </Button>
-              </Link>
+              <Button disabled title="Coming soon">
+                <Plus className="mr-2 h-4 w-4" /> New Campaign
+              </Button>
             </CardContent>
           </Card>
         ) : (
