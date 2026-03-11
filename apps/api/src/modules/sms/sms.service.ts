@@ -12,6 +12,18 @@ function getTwilioClient() {
   return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
 }
 
+// Template → CRM tag + stage mapping (client spec)
+const templateTagMap: Record<string, { tag: string; crmStage?: string }> = {
+  "checklist-confirmed":   { tag: "team-briefed", crmStage: "IN_PROGRESS" },
+  "service-finished":      { tag: "service-completed", crmStage: "SERVICE_COMPLETED" },
+  "payment-followup":      { tag: "payment-pending", crmStage: "PAYMENT_PENDING" },
+  "payment-deep":          { tag: "deposit-required", crmStage: "CHECKLIST_SENT" },
+  "payment-first-regular": { tag: "payment-after-service", crmStage: "SCHEDULED" },
+  "payment-no-deposit":    { tag: "payment-after-service" },
+  "recommend-recurring":   { tag: "upsell-regular", crmStage: "PAID" },
+  "referral-request":      { tag: "referral-request", crmStage: "PAID" },
+};
+
 export async function sendMessage(input: SendMessageInput) {
   const lead = await prisma.lead.findUnique({ where: { id: input.leadId } });
   if (!lead) throw new AppError(404, "Lead not found");
@@ -49,6 +61,22 @@ export async function sendMessage(input: SendMessageInput) {
       },
       include: { lead: { select: { id: true, firstName: true, lastName: true, phone: true } } },
     });
+
+    // Apply CRM tag + advance stage when sending a template message
+    if (input.templateId && templateTagMap[input.templateId]) {
+      const mapping = templateTagMap[input.templateId];
+      const currentTags = (lead.tags as string[]) || [];
+      const newTags = currentTags.includes(mapping.tag) ? currentTags : [...currentTags, mapping.tag];
+
+      await (prisma.lead.update as any)({
+        where: { id: lead.id },
+        data: {
+          tags: newTags,
+          ...(mapping.crmStage ? { crmStage: mapping.crmStage } : {}),
+        },
+      });
+      logger.info({ leadId: lead.id, templateId: input.templateId, tag: mapping.tag, crmStage: mapping.crmStage }, "CRM tag applied via template");
+    }
 
     logger.info({ messageId: updated.id, twilioSid: twilioMsg.sid, to: lead.phone }, "SMS sent");
     return updated;

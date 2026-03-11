@@ -3,6 +3,7 @@ import { z } from "zod";
 export const sendMessageSchema = z.object({
   leadId: z.string().min(1),
   body: z.string().min(1).max(1600),
+  templateId: z.string().optional(),
 });
 
 export const listMessagesSchema = z.object({

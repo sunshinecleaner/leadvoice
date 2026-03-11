@@ -503,34 +503,33 @@ function mapOutcomeToCrmStage(outcome: string, structured: Record<string, unknow
 function buildTags(outcome: string, structured: Record<string, unknown>): string[] {
   const tags: string[] = [];
   const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
+  const isDeepCleaning = String(structured.serviceType || "").toLowerCase().includes("deep");
 
-  // CRM stage tags (match client spec)
-  if (outcome === "VOICEMAIL" || outcome === "NOT_INTERESTED" || outcome === "CALLBACK") {
-    tags.push("lead-new");
-  }
-  if (outcome === "INTERESTED" && hasFullDetails) {
+  // Stage tags (client CRM spec)
+  if (outcome === "VOICEMAIL") {
+    tags.push("lead-new", "info-missing");
+  } else if (outcome === "CALLBACK") {
+    tags.push("lead-new", "callback-requested");
+  } else if (outcome === "NOT_INTERESTED") {
+    tags.push("lead-new", "not-interested");
+  } else if (outcome === "INTERESTED" && !hasFullDetails) {
+    tags.push("lead-new", "info-missing");
+  } else if (outcome === "INTERESTED" && hasFullDetails) {
     tags.push("lead-qualified");
-  }
-  if (outcome === "INTERESTED" && !hasFullDetails) {
-    tags.push("lead-new");
-  }
-  if (outcome === "SCHEDULED") {
+  } else if (outcome === "SCHEDULED") {
     tags.push("lead-qualified", "scheduled");
-  }
-  if (outcome === "DEPOSIT_REQUESTED") {
+  } else if (outcome === "DEPOSIT_REQUESTED") {
     tags.push("lead-qualified", "checklist-sent", "deposit-required");
   }
-  if (outcome === "CALLBACK") {
-    tags.push("callback-requested");
-  }
 
-  // Service type tags
-  if (structured.serviceType) {
+  // Payment tags
+  if (isDeepCleaning) {
+    tags.push("deep-cleaning", "deposit-required");
+  } else if (structured.serviceType) {
     const st = String(structured.serviceType).toLowerCase();
-    if (st.includes("deep")) tags.push("deep-cleaning", "deposit-required");
-    else if (st.includes("standard")) tags.push("standard-cleaning");
-    else if (st.includes("recurring")) tags.push("recurring-client");
-    else if (st.includes("move")) tags.push("move-cleaning");
+    if (st.includes("standard") || st.includes("recurring")) tags.push("payment-after-service");
+    if (st.includes("recurring")) tags.push("recurring-client");
+    if (st.includes("move")) tags.push("payment-after-service", "move-cleaning");
   }
 
   // Channel tag — phone confirmed via call

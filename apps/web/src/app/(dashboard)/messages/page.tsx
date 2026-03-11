@@ -64,6 +64,7 @@ export default function MessagesPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [messageBody, setMessageBody] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -103,11 +104,12 @@ export default function MessagesPage() {
       await api("/api/messages/send", {
         token,
         method: "POST",
-        body: JSON.stringify({ leadId: selectedLeadId, body: messageBody }),
+        body: JSON.stringify({ leadId: selectedLeadId, body: messageBody, ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}) }),
       });
       setShowSendForm(false);
       setSelectedLeadId("");
       setMessageBody("");
+      setSelectedTemplateId("");
       fetchMessages();
     } catch {
     } finally {
@@ -171,10 +173,13 @@ export default function MessagesPage() {
                 <label className="text-sm font-medium">Message</label>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value=""
+                  value={selectedTemplateId}
                   onChange={(e) => {
                     const tpl = messageTemplates.find((t) => t.id === e.target.value);
-                    if (tpl) setMessageBody(tpl.body);
+                    if (tpl) {
+                      setMessageBody(tpl.body);
+                      setSelectedTemplateId(tpl.id);
+                    }
                   }}
                 >
                   <option value="">Use a template...</option>
