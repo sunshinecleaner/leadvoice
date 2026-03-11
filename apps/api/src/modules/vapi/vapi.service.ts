@@ -487,22 +487,44 @@ function mapVapiOutcome(
   return "NOT_INTERESTED";
 }
 
-function mapOutcomeToCrmStage(outcome: string, _structured: Record<string, unknown>): string {
+function mapOutcomeToCrmStage(outcome: string, structured: Record<string, unknown>): string {
+  // CRM Funnel: Lead Novo → Sem Telefone → Qualificado → Checklist Enviado → Agendado → Em Execução → Finalizado → Pgto Pendente → Pós-Serviço
+  const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
+
   if (outcome === "SCHEDULED") return "SCHEDULED";
   if (outcome === "DEPOSIT_REQUESTED") return "CHECKLIST_SENT";
-  if (outcome === "INTERESTED") return "LEAD_QUALIFIED";
+  if (outcome === "INTERESTED" && hasFullDetails) return "LEAD_QUALIFIED";
+  if (outcome === "INTERESTED") return "LEAD_NEW"; // Interested but missing details
   if (outcome === "CALLBACK") return "LEAD_NEW";
+  if (outcome === "VOICEMAIL") return "LEAD_NEW";
   return "LEAD_NEW";
 }
 
 function buildTags(outcome: string, structured: Record<string, unknown>): string[] {
   const tags: string[] = [];
+  const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
 
-  if (outcome === "INTERESTED" || outcome === "SCHEDULED") tags.push("lead-qualified");
-  if (outcome === "SCHEDULED") tags.push("scheduled");
-  if (outcome === "CALLBACK") tags.push("callback-requested");
-  if (outcome === "DEPOSIT_REQUESTED") tags.push("deposit-required");
+  // CRM stage tags (match client spec)
+  if (outcome === "VOICEMAIL" || outcome === "NOT_INTERESTED" || outcome === "CALLBACK") {
+    tags.push("lead-new");
+  }
+  if (outcome === "INTERESTED" && hasFullDetails) {
+    tags.push("lead-qualified");
+  }
+  if (outcome === "INTERESTED" && !hasFullDetails) {
+    tags.push("lead-new");
+  }
+  if (outcome === "SCHEDULED") {
+    tags.push("lead-qualified", "scheduled");
+  }
+  if (outcome === "DEPOSIT_REQUESTED") {
+    tags.push("lead-qualified", "checklist-sent", "deposit-required");
+  }
+  if (outcome === "CALLBACK") {
+    tags.push("callback-requested");
+  }
 
+  // Service type tags
   if (structured.serviceType) {
     const st = String(structured.serviceType).toLowerCase();
     if (st.includes("deep")) tags.push("deep-cleaning", "deposit-required");
@@ -511,7 +533,10 @@ function buildTags(outcome: string, structured: Record<string, unknown>): string
     else if (st.includes("move")) tags.push("move-cleaning");
   }
 
-  if (String(structured.language || "").toLowerCase() === "es") tags.push("spanish-speaker");
+  // Channel tag — phone confirmed via call
+  if (structured.firstName && structured.firstName !== "Unknown") {
+    tags.push("channel-sms");
+  }
 
   return tags;
 }
