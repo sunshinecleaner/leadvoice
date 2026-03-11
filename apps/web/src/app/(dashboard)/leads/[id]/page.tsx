@@ -87,17 +87,17 @@ const outcomeColors: Record<string, "success" | "destructive" | "warning" | "def
 };
 
 const crmStageLabels: Record<string, string> = {
-  LEAD_NEW: "New Lead",
-  LEAD_NO_PHONE: "No Phone",
-  LEAD_QUALIFIED: "Qualified",
-  CHECKLIST_SENT: "Checklist Sent",
-  SCHEDULED: "Scheduled",
-  IN_PROGRESS: "In Progress",
-  SERVICE_COMPLETED: "Completed",
-  PAYMENT_PENDING: "Payment Pending",
-  PAID: "Paid",
-  UPSELL: "Upsell",
-  REFERRAL_REQUESTED: "Referral",
+  LEAD_NEW: "Lead Novo",
+  LEAD_NO_PHONE: "Sem Telefone",
+  LEAD_QUALIFIED: "Qualificado",
+  CHECKLIST_SENT: "Checklist Enviado",
+  SCHEDULED: "Agendado",
+  IN_PROGRESS: "Em Execução",
+  SERVICE_COMPLETED: "Finalizado",
+  PAYMENT_PENDING: "Pgto Pendente",
+  PAID: "Pós-Serviço",
+  UPSELL: "Pós-Serviço",
+  REFERRAL_REQUESTED: "Pós-Serviço",
 };
 
 const serviceTypeLabels: Record<string, string> = {
