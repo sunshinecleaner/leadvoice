@@ -3,6 +3,8 @@ import type { PaginationParams } from "@leadvoice/shared";
 import { paginationMeta } from "../../utils/helpers.js";
 import { NotFoundError } from "../../utils/errors.js";
 import type { CreateLeadInput, UpdateLeadInput } from "./leads.schema.js";
+import * as googleCalendarService from "../google-calendar/google-calendar.service.js";
+import { logger } from "../../lib/logger.js";
 
 export async function getLeads(params: PaginationParams, filters?: { status?: string; source?: string }) {
   const where: Prisma.LeadWhereInput = {};
@@ -80,12 +82,28 @@ export async function createLead(input: CreateLeadInput) {
 }
 
 export async function updateLead(id: string, input: UpdateLeadInput) {
-  await getLeadById(id);
-  return prisma.lead.update({
+  const existing = await getLeadById(id);
+  const updated = await prisma.lead.update({
     where: { id },
     data: input,
     include: { assignedTo: { select: { id: true, name: true, email: true } } },
   });
+
+  // When crmStage transitions to SCHEDULED, create a Google Calendar event for the most recent service request
+  const inputAny = input as any;
+  if (inputAny.crmStage === "SCHEDULED" && existing.crmStage !== "SCHEDULED") {
+    const latestSr = await prisma.serviceRequest.findFirst({
+      where: { leadId: id },
+      orderBy: { createdAt: "desc" },
+    });
+    if (latestSr) {
+      googleCalendarService.createEventForServiceRequest(latestSr.id).catch((err) =>
+        logger.warn({ err, leadId: id, serviceRequestId: latestSr.id }, "Failed to create Google Calendar event for scheduled lead")
+      );
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteLead(id: string) {

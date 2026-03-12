@@ -30,6 +30,11 @@ const envSchema = z.object({
   N8N_SMS_WEBHOOK_URL: z.string().optional(),
   N8N_API_KEY: z.string().optional(),
 
+  // Google Calendar
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().optional(),
+
   // Notifications
   RESEND_API_KEY: z.string().optional(),
   NOTIFICATION_EMAIL: z.string().email().optional(),

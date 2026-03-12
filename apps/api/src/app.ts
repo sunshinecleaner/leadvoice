@@ -15,6 +15,7 @@ import { webhooksRoutes } from "./modules/webhooks/webhooks.routes.js";
 import { integrationsRoutes } from "./modules/integrations/integrations.routes.js";
 import { smsRoutes } from "./modules/sms/sms.routes.js";
 import { callsRoutes } from "./modules/calls/calls.routes.js";
+import { googleCalendarRoutes } from "./modules/google-calendar/google-calendar.routes.js";
 import formbody from "@fastify/formbody";
 
 export async function buildApp() {
@@ -92,6 +93,7 @@ export async function buildApp() {
   await app.register(integrationsRoutes, { prefix: "/api/integrations" });
   await app.register(smsRoutes, { prefix: "/api/messages" });
   await app.register(callsRoutes, { prefix: "/api/calls" });
+  await app.register(googleCalendarRoutes, { prefix: "/api/google-calendar" });
 
   return app;
 }

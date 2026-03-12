@@ -11,6 +11,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/messages", label: "Messages", icon: MessageSquare },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

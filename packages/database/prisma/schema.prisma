@@ -173,6 +173,10 @@ enum IntegrationType {
   N8N
 }
 
+enum UserIntegrationType {
+  GOOGLE_CALENDAR
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -189,6 +193,7 @@ model User {
   assignedLeads    Lead[]
   createdCampaigns Campaign[]
   handledCalls     Call[]     @relation("AgentCalls")
+  userIntegrations UserIntegration[]
 
   @@map("users")
 }
@@ -255,6 +260,8 @@ model ServiceRequest {
   checklistSent  Boolean          @default(false)
   scheduledDate  DateTime?
   notes          String?          @db.Text
+  googleCalendarEventId String?
+  googleCalendarLink    String?
 
   // Pricing
   estimatedAmount Float?
@@ -380,6 +387,25 @@ model Message {
   @@index([status])
   @@index([twilioSid])
   @@map("messages")
+}
+
+model UserIntegration {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         UserIntegrationType
+  accessToken  String              @db.Text
+  refreshToken String              @db.Text
+  expiresAt    DateTime
+  scope        String?
+  metadata     Json?
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("user_integrations")
 }
 
 model Integration {

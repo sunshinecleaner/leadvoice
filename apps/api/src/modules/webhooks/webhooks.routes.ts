@@ -4,6 +4,7 @@ import { logger } from "../../lib/logger.js";
 import * as vapiService from "../vapi/vapi.service.js";
 import * as smsService from "../sms/sms.service.js";
 import { prisma } from "@leadvoice/database";
+import { googleCalendarWebhookHandler } from "../google-calendar/google-calendar.routes.js";
 
 export async function webhooksRoutes(app: FastifyInstance) {
   // ─── VAPI webhook ────────────────────────────────────────────────────────────
@@ -197,6 +198,9 @@ export async function webhooksRoutes(app: FastifyInstance) {
     reply.type("text/xml");
     return reply.send("<Response></Response>");
   });
+
+  // ─── Google Calendar push notification webhook ────────────────────────────────
+  app.post("/google-calendar", googleCalendarWebhookHandler);
 
   // ─── Generic inbound webhook ─────────────────────────────────────────────────
   app.post("/inbound", async (request, reply) => {
