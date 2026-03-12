@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CalendarDays, RefreshCw, Link2, Link2Off, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -437,7 +437,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [gcStatus, setGcStatus] = useState<GCalStatus>({ connected: false });
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [connectingGc, setConnectingGc] = useState(false);
+
 
   // Handle OAuth redirect params
   useEffect(() => {
@@ -542,16 +542,6 @@ export default function CalendarPage() {
     fetchEvents();
   }, [fetchEvents]);
 
-  const handleConnectGoogle = async () => {
-    if (!token) return;
-    setConnectingGc(true);
-    try {
-      const res = await api<{ success: boolean; data: { url: string } }>("/api/google-calendar/auth/url", { token });
-      window.location.href = res.data.url;
-    } catch {
-      setConnectingGc(false);
-    }
-  };
 
   const handleDisconnectGoogle = async () => {
     if (!token) return;
@@ -615,12 +605,7 @@ export default function CalendarPage() {
                   Disconnect
                 </Button>
               </div>
-            ) : (
-              <Button size="sm" onClick={handleConnectGoogle} disabled={connectingGc}>
-                <Link2 className="mr-1.5 h-4 w-4" />
-                {connectingGc ? "Connecting..." : "Connect Google Calendar"}
-              </Button>
-            )}
+            ) : null}
             <Button variant="ghost" size="icon" onClick={() => fetchEvents()} title="Refresh">
               <RefreshCw className={["h-4 w-4", loading ? "animate-spin" : ""].join(" ")} />
             </Button>
@@ -681,23 +666,6 @@ export default function CalendarPage() {
           )}
         </div>
 
-        {/* Google Calendar connect prompt */}
-        {!gcStatus.connected && (
-          <Card className="border-dashed">
-            <CardContent className="flex items-center gap-4 py-4">
-              <CalendarDays className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1">
-                <p className="font-medium text-sm">Connect Google Calendar</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Sync scheduled cleanings to your Google Calendar. Changes made in Google Calendar will automatically update the schedule here.
-                </p>
-              </div>
-              <Button size="sm" onClick={handleConnectGoogle} disabled={connectingGc}>
-                {connectingGc ? "Connecting..." : "Connect"}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Calendar view */}
         <Card className="flex-1 overflow-hidden">
