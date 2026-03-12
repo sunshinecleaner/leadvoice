@@ -1,4 +1,4 @@
-import { prisma } from "../../lib/prisma.js";
+import { prisma } from "@leadvoice/database";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 import * as gcClient from "./google-calendar.client.js";
