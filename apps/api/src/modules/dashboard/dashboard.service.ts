@@ -28,6 +28,27 @@ export async function getStats(): Promise<DashboardStats> {
   };
 }
 
+export async function getLeadsToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return prisma.lead.findMany({
+    where: { createdAt: { gte: today } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+      crmStage: true,
+      status: true,
+      source: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getChartData() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

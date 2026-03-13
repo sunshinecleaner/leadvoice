@@ -29,4 +29,9 @@ export async function dashboardPublicRoutes(app: FastifyInstance) {
     const stats = await dashboardService.getStats();
     return reply.send({ success: true, data: stats });
   });
+
+  app.get("/leads-today", async (_request, reply) => {
+    const leads = await dashboardService.getLeadsToday();
+    return reply.send({ success: true, data: leads });
+  });
 }
