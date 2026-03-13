@@ -1,9 +1,17 @@
 import { z } from "zod";
 
 export const sendMessageSchema = z.object({
-  leadId: z.string().min(1),
+  leadId: z.string().min(1).optional(),
+  phone: z.string().min(10).optional(),
   body: z.string().min(1).max(1600),
   templateId: z.string().optional(),
+}).refine((data) => data.leadId || data.phone, {
+  message: "Either leadId or phone is required",
+});
+
+export const sendDirectSmsSchema = z.object({
+  phone: z.string().min(10),
+  body: z.string().min(1).max(1600),
 });
 
 export const listMessagesSchema = z.object({
@@ -14,4 +22,5 @@ export const listMessagesSchema = z.object({
 });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type SendDirectSmsInput = z.infer<typeof sendDirectSmsSchema>;
 export type ListMessagesInput = z.infer<typeof listMessagesSchema>;

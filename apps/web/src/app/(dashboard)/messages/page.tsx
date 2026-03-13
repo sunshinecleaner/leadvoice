@@ -71,6 +71,8 @@ export default function MessagesPage() {
   const [showSendForm, setShowSendForm] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [sendMode, setSendMode] = useState<"lead" | "phone">("lead");
   const [messageBody, setMessageBody] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [sending, setSending] = useState(false);
@@ -106,18 +108,29 @@ export default function MessagesPage() {
   };
 
   const handleSend = async () => {
-    if (!token || !selectedLeadId || !messageBody.trim()) return;
+    if (!token || !messageBody.trim()) return;
+    if (sendMode === "lead" && !selectedLeadId) return;
+    if (sendMode === "phone" && !manualPhone.trim()) return;
     setSending(true);
     try {
+      const payload: Record<string, string> = { body: messageBody };
+      if (sendMode === "lead") {
+        payload.leadId = selectedLeadId;
+      } else {
+        payload.phone = manualPhone.startsWith("+") ? manualPhone : `+${manualPhone}`;
+      }
+      if (selectedTemplateId) payload.templateId = selectedTemplateId;
       await api("/api/messages/send", {
         token,
         method: "POST",
-        body: JSON.stringify({ leadId: selectedLeadId, body: messageBody, ...(selectedTemplateId ? { templateId: selectedTemplateId } : {}) }),
+        body: JSON.stringify(payload),
       });
       setShowSendForm(false);
       setSelectedLeadId("");
+      setManualPhone("");
       setMessageBody("");
       setSelectedTemplateId("");
+      setSendMode("lead");
       fetchMessages();
     } catch {
     } finally {
@@ -158,24 +171,50 @@ export default function MessagesPage() {
                 </button>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Select Lead</label>
-                <Input
-                  placeholder="Search leads by name or phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={selectedLeadId}
-                  onChange={(e) => setSelectedLeadId(e.target.value)}
-                >
-                  <option value="">Choose a lead...</option>
-                  {filteredLeads.map((lead) => (
-                    <option key={lead.id} value={lead.id}>
-                      {lead.firstName} {lead.lastName} — {lead.phone}
-                    </option>
-                  ))}
-                </select>
+                <label className="text-sm font-medium">Send to</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={sendMode === "lead" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setSendMode("lead"); fetchLeads(); }}
+                  >
+                    Lead
+                  </Button>
+                  <Button
+                    variant={sendMode === "phone" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSendMode("phone")}
+                  >
+                    Phone Number
+                  </Button>
+                </div>
+                {sendMode === "lead" ? (
+                  <>
+                    <Input
+                      placeholder="Search leads by name or phone..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={selectedLeadId}
+                      onChange={(e) => setSelectedLeadId(e.target.value)}
+                    >
+                      <option value="">Choose a lead...</option>
+                      {filteredLeads.map((lead) => (
+                        <option key={lead.id} value={lead.id}>
+                          {lead.firstName} {lead.lastName} — {lead.phone}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <Input
+                    placeholder="+1 (470) 555-1234"
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Message</label>
@@ -205,7 +244,7 @@ export default function MessagesPage() {
                 <p className="text-xs text-muted-foreground text-right">{messageBody.length}/1600</p>
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleSend} disabled={sending || !selectedLeadId || !messageBody.trim()} size="sm">
+                <Button onClick={handleSend} disabled={sending || (sendMode === "lead" ? !selectedLeadId : !manualPhone.trim()) || !messageBody.trim()} size="sm">
                   {sending ? "Sending..." : "Send Message"}
                 </Button>
               </div>

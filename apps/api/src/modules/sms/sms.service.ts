@@ -26,21 +26,33 @@ const templateTagMap: Record<string, { tags: string[]; crmStage?: string }> = {
 };
 
 export async function sendMessage(input: SendMessageInput) {
-  const lead = await prisma.lead.findUnique({ where: { id: input.leadId } });
-  if (!lead) throw new AppError(404, "Lead not found");
-  if (!lead.phone) throw new AppError(400, "Lead has no phone number");
-
   const from = env.TWILIO_PHONE_NUMBER;
   if (!from) throw new AppError(500, "Twilio phone number not configured");
+
+  let toPhone: string;
+  let leadId: string | null = null;
+
+  if (input.leadId) {
+    const lead = await prisma.lead.findUnique({ where: { id: input.leadId } });
+    if (!lead) throw new AppError(404, "Lead not found");
+    if (!lead.phone) throw new AppError(400, "Lead has no phone number");
+    toPhone = lead.phone;
+    leadId = lead.id;
+  } else if (input.phone) {
+    toPhone = input.phone.startsWith("+") ? input.phone : `+${input.phone}`;
+    leadId = null;
+  } else {
+    throw new AppError(400, "Either leadId or phone is required");
+  }
 
   // Create record first
   const message = await prisma.message.create({
     data: {
-      leadId: lead.id,
+      leadId,
       direction: "OUTBOUND",
       status: "QUEUED",
       from,
-      to: lead.phone,
+      to: toPhone,
       body: input.body,
     },
   });
@@ -50,7 +62,7 @@ export async function sendMessage(input: SendMessageInput) {
     const twilioMsg = await client.messages.create({
       body: input.body,
       from,
-      to: lead.phone,
+      to: toPhone,
     });
 
     const updated = await prisma.message.update({
@@ -64,22 +76,25 @@ export async function sendMessage(input: SendMessageInput) {
     });
 
     // Apply CRM tags + advance stage when sending a template message
-    if (input.templateId && templateTagMap[input.templateId]) {
-      const mapping = templateTagMap[input.templateId];
-      const currentTags = (lead.tags as string[]) || [];
-      const newTags = [...new Set([...currentTags, ...mapping.tags])];
+    if (leadId && input.templateId && templateTagMap[input.templateId]) {
+      const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+      if (lead) {
+        const mapping = templateTagMap[input.templateId];
+        const currentTags = (lead.tags as string[]) || [];
+        const newTags = [...new Set([...currentTags, ...mapping.tags])];
 
-      await (prisma.lead.update as any)({
-        where: { id: lead.id },
-        data: {
-          tags: newTags,
-          ...(mapping.crmStage ? { crmStage: mapping.crmStage } : {}),
-        },
-      });
-      logger.info({ leadId: lead.id, templateId: input.templateId, tags: mapping.tags, crmStage: mapping.crmStage }, "CRM tags applied via template");
+        await (prisma.lead.update as any)({
+          where: { id: lead.id },
+          data: {
+            tags: newTags,
+            ...(mapping.crmStage ? { crmStage: mapping.crmStage } : {}),
+          },
+        });
+        logger.info({ leadId: lead.id, templateId: input.templateId, tags: mapping.tags, crmStage: mapping.crmStage }, "CRM tags applied via template");
+      }
     }
 
-    logger.info({ messageId: updated.id, twilioSid: twilioMsg.sid, to: lead.phone }, "SMS sent");
+    logger.info({ messageId: updated.id, twilioSid: twilioMsg.sid, to: toPhone }, "SMS sent");
     return updated;
   } catch (error: any) {
     await prisma.message.update({

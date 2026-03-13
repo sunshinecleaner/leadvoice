@@ -158,7 +158,7 @@ export async function processCallCompleted(
       duration: Math.round(vapiData.duration || 0),
       recordingUrl: vapiData.recordingUrl,
       transcription: vapiData.transcript,
-      summary: vapiData.summary || vapiData.analysis?.summary,
+      summary: (structured.summary as string) || vapiData.summary || vapiData.analysis?.summary,
       outcome,
       endedAt: new Date(),
     },
@@ -201,7 +201,7 @@ export async function processCallCompleted(
     outcome,
     duration: vapiData.duration,
     transcript: vapiData.transcript,
-    summary: vapiData.summary,
+    summary: (structured.summary as string) || vapiData.summary,
     structuredData: structured,
   };
 
@@ -430,12 +430,14 @@ Fields to extract:
 - preferredSchedule (string | null): preferred days/time
 - outcome (string): interested, scheduled, deposit_requested, callback, not_interested, or voicemail
 - notes (string | null): any additional notes or special requests
+- summary (string): A clean, concise 2-3 sentence summary of the call. Include: caller name, property details (type, beds/baths, location), service requested, condition level, and outcome. Write in third person, professional tone. Example: "John Smith called about a 3-bed/2-bath house in Atlanta, GA (ZIP 30301). Requested a standard cleaning, property is lightly maintained. Appointment scheduled for Monday at 10 AM."
 
 IMPORTANT RULES:
 1. If the caller did NOT provide their name, set firstName and lastName to null (not "").
 2. Use the EXACT numbers the caller stated (don't change 2 bedrooms to 3).
 3. For outcome: "interested" if caller engaged and provided property details. "not_interested" if they declined or hung up quickly. "voicemail" if no live conversation.
-4. Always include the outcome field — it is required.`,
+4. Always include the outcome and summary fields — they are required.
+5. The summary field must be a clean, human-readable text (no markdown, no bullets, no asterisks).`,
           },
           { role: "user", content: text },
         ],
