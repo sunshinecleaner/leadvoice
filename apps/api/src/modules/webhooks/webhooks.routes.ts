@@ -202,6 +202,51 @@ export async function webhooksRoutes(app: FastifyInstance) {
   // ─── Google Calendar push notification webhook ────────────────────────────────
   app.post("/google-calendar", googleCalendarWebhookHandler);
 
+  // ─── Google Ads lead webhook ──────────────────────────────────────────────────
+  app.post("/google-ads", async (request, reply) => {
+    const body = request.body as Record<string, unknown>;
+    logger.info({ keys: Object.keys(body) }, "Google Ads webhook received");
+
+    // Google Ads sends lead form data — accept multiple field naming conventions
+    const firstName = String(body.firstName || body.first_name || body.FIRST_NAME || body.name || "Unknown");
+    const lastName = String(body.lastName || body.last_name || body.LAST_NAME || "");
+    const phone = String(body.phone || body.phone_number || body.PHONE_NUMBER || "");
+    const email = body.email || body.EMAIL ? String(body.email || body.EMAIL) : undefined;
+    const city = body.city || body.CITY ? String(body.city || body.CITY) : undefined;
+    const state = body.state || body.STATE ? String(body.state || body.STATE) : undefined;
+
+    if (!phone) {
+      return reply.status(400).send({ success: false, error: "Phone number is required" });
+    }
+
+    // Check for duplicate by phone
+    const existing = await prisma.lead.findFirst({
+      where: { phone: { contains: phone.replace(/\D/g, "").slice(-10) } },
+    });
+
+    if (existing) {
+      logger.info({ leadId: existing.id, phone }, "Google Ads lead already exists");
+      return reply.send({ success: true, data: existing, duplicate: true });
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
+        firstName,
+        lastName,
+        phone: phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`,
+        email,
+        city,
+        state,
+        source: "LANDING_PAGE",
+        tags: ["google-ads"],
+        metadata: body as any,
+      },
+    });
+
+    logger.info({ leadId: lead.id, phone, source: "google-ads" }, "Google Ads lead created");
+    return reply.status(201).send({ success: true, data: lead });
+  });
+
   // ─── Generic inbound webhook ─────────────────────────────────────────────────
   app.post("/inbound", async (request, reply) => {
     const body = request.body as Record<string, unknown>;
