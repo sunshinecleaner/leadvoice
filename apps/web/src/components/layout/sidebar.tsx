@@ -18,7 +18,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useRouter } from "next/navigation";
 
 const navItems = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/calls", label: "Calls", icon: Phone },
