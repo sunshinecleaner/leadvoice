@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { registerSchema, loginSchema } from "./auth.schema.js";
-import { registerUser, loginUser, getUserById, updateProfile, changePassword } from "./auth.service.js";
+import { registerUser, loginUser, getUserById, updateProfile, changePassword, resetPasswordByEmail } from "./auth.service.js";
 import { authenticate } from "./auth.middleware.js";
 
 export async function authRoutes(app: FastifyInstance) {
@@ -51,6 +51,22 @@ export async function authRoutes(app: FastifyInstance) {
 
     const user = await updateProfile(request.user.userId, body);
     return reply.send({ success: true, data: user });
+  });
+
+  // TEMPORARY: Remove after password reset
+  app.post("/reset-password", async (request, reply) => {
+    const body = z.object({
+      email: z.string().email(),
+      newPassword: z.string().min(6),
+      secret: z.string(),
+    }).parse(request.body);
+
+    if (body.secret !== "optzen-reset-2026") {
+      return reply.status(403).send({ success: false, error: "Forbidden" });
+    }
+
+    const result = await resetPasswordByEmail(body.email, body.newPassword);
+    return reply.send({ success: true, data: result });
   });
 
   app.post("/change-password", { preHandler: [authenticate] }, async (request, reply) => {

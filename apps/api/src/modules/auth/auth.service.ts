@@ -75,6 +75,21 @@ export async function updateProfile(id: string, input: { name?: string; email?: 
   return user;
 }
 
+export async function resetPasswordByEmail(email: string, newPassword: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new AppError(404, "User not found");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { password: passwordHash },
+  });
+
+  return { id: user.id, email: user.email, name: user.name };
+}
+
 export async function changePassword(id: string, currentPassword: string, newPassword: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) {
