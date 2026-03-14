@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!token) return null;
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-background">
       <Sidebar />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>

@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Phone } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth-store";
 import { api } from "@/lib/api";
 
@@ -24,7 +23,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await api<{ success: boolean; data: { user: any; token: string } }>("/api/auth/login", {
+      const res = await api<{
+        success: boolean;
+        data: { user: any; token: string };
+      }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -39,58 +41,112 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/50">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Phone className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle>Welcome back</CardTitle>
-          <CardDescription>Sign in to your LeadVoice account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-            )}
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@leadvoice.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Sign up
-            </Link>
+    <div className="flex min-h-screen">
+      {/* Left Panel - Branding */}
+      <div className="hidden w-1/2 flex-col justify-between bg-[hsl(152,35%,18%)] p-12 lg:flex">
+        <div>
+          <Image
+            src="https://sunshinebrazilian.com/wp-content/uploads/2025/05/Logo-horizontal-preto.png"
+            alt="Sunshine Brazilian"
+            width={220}
+            height={50}
+            className="brightness-0 invert"
+            unoptimized
+          />
+        </div>
+        <div className="space-y-6">
+          <h1 className="text-4xl font-bold leading-tight text-white">
+            Smart Lead Management
+            <br />
+            <span className="text-[hsl(38,90%,55%)]">Powered by AI</span>
+          </h1>
+          <p className="max-w-md text-lg text-white/60">
+            Automate your outreach with SunnyBee AI. Manage leads, track calls,
+            and grow your business — all in one place.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-sm text-white/30">
+          © {new Date().getFullYear()} Sunshine WL Brazilian LLC
+        </p>
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex w-full flex-col items-center justify-center bg-[hsl(40,20%,96%)] px-8 lg:w-1/2">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="mb-8 flex justify-center lg:hidden">
+            <Image
+              src="https://sunshinebrazilian.com/wp-content/uploads/2025/05/Logo-horizontal-preto.png"
+              alt="Sunshine Brazilian"
+              width={200}
+              height={45}
+              unoptimized
+            />
+          </div>
+
+          <div className="rounded-2xl bg-white p-8 shadow-sm">
+            <div className="mb-6 text-center">
+              <h2 className="text-2xl font-bold">Welcome back</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sign in to your account
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="rounded-xl"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full rounded-xl bg-primary py-5 text-base font-semibold hover:bg-primary/90"
+                disabled={loading}
+              >
+                {loading ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/register"
+                className="font-medium text-primary hover:underline"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
