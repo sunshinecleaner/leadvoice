@@ -57,8 +57,6 @@ export default function LoginPage() {
         <div className="space-y-6">
           <h1 className="text-4xl font-bold leading-tight text-white">
             Smart Lead Management
-            <br />
-            <span className="text-[hsl(258,65%,80%)]">Powered by AI</span>
           </h1>
           <p className="max-w-md text-lg text-white/60">
             Automate your outreach with SunnyBee AI. Manage leads, track calls,
@@ -71,14 +69,7 @@ export default function LoginPage() {
           </p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-white/40">Powered by</span>
-            <Image
-              src="https://github.com/n8ndevelop/logo/blob/main/%20optzen.png?raw=true"
-              alt="Optzen"
-              width={70}
-              height={20}
-              className="brightness-0 invert opacity-60"
-              unoptimized
-            />
+            <span className="text-sm font-semibold tracking-wide text-white/60">Optzen</span>
           </div>
         </div>
       </div>
