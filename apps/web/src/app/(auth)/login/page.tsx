@@ -69,9 +69,16 @@ export default function LoginPage() {
           <p className="text-sm text-white/30">
             © {new Date().getFullYear()} Sunshine WL Brazilian LLC
           </p>
-          <div className="flex items-center gap-2 text-white/40">
-            <span className="text-xs">Powered by</span>
-            <span className="text-sm font-semibold tracking-wide text-white/60">Optzen</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/40">Powered by</span>
+            <Image
+              src="https://github.com/n8ndevelop/logo/blob/main/%20optzen.png?raw=true"
+              alt="Optzen"
+              width={70}
+              height={20}
+              className="brightness-0 invert opacity-60"
+              unoptimized
+            />
           </div>
         </div>
       </div>

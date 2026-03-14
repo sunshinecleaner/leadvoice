@@ -9,6 +9,11 @@ const nextConfig = {
         hostname: "sunshinebrazilian.com",
         pathname: "/wp-content/uploads/**",
       },
+      {
+        protocol: "https",
+        hostname: "github.com",
+        pathname: "/n8ndevelop/logo/**",
+      },
     ],
   },
 };
