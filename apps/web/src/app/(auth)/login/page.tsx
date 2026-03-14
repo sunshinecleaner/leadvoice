@@ -58,7 +58,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold leading-tight text-white">
             Smart Lead Management
             <br />
-            <span className="text-[hsl(258,60%,72%)]">Powered by AI</span>
+            <span className="text-[hsl(258,65%,80%)]">Powered by Optzen AI</span>
           </h1>
           <p className="max-w-md text-lg text-white/60">
             Automate your outreach with SunnyBee AI. Manage leads, track calls,
