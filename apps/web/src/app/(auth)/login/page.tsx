@@ -58,16 +58,22 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold leading-tight text-white">
             Smart Lead Management
             <br />
-            <span className="text-[hsl(258,65%,80%)]">Powered by Optzen AI</span>
+            <span className="text-[hsl(258,65%,80%)]">Powered by AI</span>
           </h1>
           <p className="max-w-md text-lg text-white/60">
             Automate your outreach with SunnyBee AI. Manage leads, track calls,
             and grow your business — all in one place.
           </p>
         </div>
-        <p className="text-sm text-white/30">
-          © {new Date().getFullYear()} Sunshine WL Brazilian LLC
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-white/30">
+            © {new Date().getFullYear()} Sunshine WL Brazilian LLC
+          </p>
+          <div className="flex items-center gap-2 text-white/40">
+            <span className="text-xs">Powered by</span>
+            <span className="text-sm font-semibold tracking-wide text-white/60">Optzen</span>
+          </div>
+        </div>
       </div>
 
       {/* Right Panel - Form */}
