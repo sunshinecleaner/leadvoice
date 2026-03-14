@@ -43,7 +43,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden w-1/2 flex-col justify-between bg-[hsl(152,35%,18%)] p-12 lg:flex">
+      <div className="hidden w-1/2 flex-col justify-between bg-[hsl(330,55%,48%)] p-12 lg:flex">
         <div>
           <Image
             src="https://sunshinebrazilian.com/wp-content/uploads/2025/05/Logo-horizontal-preto.png"
@@ -58,7 +58,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold leading-tight text-white">
             Smart Lead Management
             <br />
-            <span className="text-[hsl(38,90%,55%)]">Powered by AI</span>
+            <span className="text-[hsl(258,60%,72%)]">Powered by AI</span>
           </h1>
           <p className="max-w-md text-lg text-white/60">
             Automate your outreach with SunnyBee AI. Manage leads, track calls,
@@ -71,7 +71,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full flex-col items-center justify-center bg-[hsl(40,20%,96%)] px-8 lg:w-1/2">
+      <div className="flex w-full flex-col items-center justify-center bg-[hsl(270,20%,97%)] px-8 lg:w-1/2">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="mb-8 flex justify-center lg:hidden">
