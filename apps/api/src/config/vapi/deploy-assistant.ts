@@ -17,8 +17,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const VAPI_API_KEY = process.env.VAPI_API_KEY;
 const VAPI_ASSISTANT_ID = process.env.VAPI_ASSISTANT_ID;
-const SERVER_URL = process.env.VAPI_SERVER_URL || "https://sunshine-leadvoice-api.lxlgch.easypanel.host/api/webhooks/vapi";
-const TOOLS_BASE_URL = process.env.VAPI_TOOLS_BASE_URL || "https://sunshine-leadvoice-api.lxlgch.easypanel.host/api/vapi/tools";
+const SERVER_URL = process.env.VAPI_SERVER_URL || "https://api.sunshinebrazilian.com/api/webhooks/vapi";
+const TOOLS_BASE_URL = process.env.VAPI_TOOLS_BASE_URL || "https://api.sunshinebrazilian.com/api/vapi/tools";
 
 if (!VAPI_API_KEY) {
   console.error("Error: VAPI_API_KEY not set in environment");
@@ -186,17 +186,57 @@ const assistantConfig = {
   serverUrl: SERVER_URL,
 
   analysisPlan: {
-    summaryPrompt:
-      "Summarize this cleaning service call. Include: caller name, full address, property details, service type, condition level, price quoted, and outcome (booked, interested, callback, etc.). Write in third person.",
-    successEvaluationPrompt:
-      "Evaluate if this call was successful. Return 'booked' if the caller locked in a date. 'interested' if they want a quote or follow-up. 'callback' if they want to be called back. 'not_interested' if they declined. 'voicemail' if no live conversation. 'out_of_area' if outside service area.",
-    structuredDataPrompt:
-      "Extract structured data from the call. Only include fields explicitly mentioned. For outcome: 'booked' if date locked, 'interested' if engaged, 'callback' if wants callback, 'not_interested' if declined, 'voicemail' if no live conversation, 'out_of_area' if outside service area. Always include quotedPrice if a price was stated during the call.",
-    structuredDataSchema,
+    summaryPlan: {
+      enabled: true,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Summarize this cleaning service call in 2-3 sentences. Include: caller name, property details (type, beds/baths, location), service type, price quoted, and outcome. Write in third person, professional tone. Example: 'John Smith called about a 3-bed/2-bath house in Atlanta, GA. Quoted $380 for a deep cleaning. Appointment booked for Monday at 10 AM.'",
+        },
+        {
+          role: "user",
+          content:
+            "Here is the transcript:\n\n{{transcript}}\n\nHere is the ended reason of the call:\n\n{{endedReason}}",
+        },
+      ],
+    },
+    successEvaluationPlan: {
+      enabled: true,
+      rubric: "PassFail",
+      messages: [
+        {
+          role: "system",
+          content:
+            "Evaluate the call outcome. Respond with ONLY one of these values:\n- 'pass' if the caller booked a date, expressed interest, or wants a follow-up\n- 'fail' if the caller declined, was not interested, or the call went to voicemail",
+        },
+        {
+          role: "user",
+          content:
+            "Here is the transcript:\n\n{{transcript}}\n\nHere is the ended reason of the call:\n\n{{endedReason}}",
+        },
+      ],
+    },
+    structuredDataPlan: {
+      enabled: true,
+      schema: structuredDataSchema,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Extract structured data from the call transcript. Only include fields that were explicitly mentioned. For outcome: 'booked' if a date was locked in, 'interested' if engaged and wants quote/follow-up, 'callback' if wants to be called back, 'not_interested' if declined, 'voicemail' if no live conversation, 'out_of_area' if outside service area. Always include quotedPrice if a price was stated during the call.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON.",
+        },
+        {
+          role: "user",
+          content:
+            "Here is the transcript:\n\n{{transcript}}\n\nHere is the ended reason of the call:\n\n{{endedReason}}",
+        },
+      ],
+    },
   },
 
   recordingEnabled: true,
-  silenceTimeoutSeconds: 30,
+  silenceTimeoutSeconds: 600,
   maxDurationSeconds: 600,
 
   endCallMessage:

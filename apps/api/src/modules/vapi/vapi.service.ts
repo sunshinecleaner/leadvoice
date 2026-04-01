@@ -188,8 +188,7 @@ export async function processCallCompleted(
     await (prisma as any).serviceRequest.updateMany({
       where: { leadId: call.leadId },
       data: {
-        quotedPrice: Number(structured.quotedPrice),
-        quotedPriceExact: structured.quotedPriceExact !== false,
+        estimatedAmount: Number(structured.quotedPrice),
       },
     });
   }
