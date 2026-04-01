@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Data extracted from a Sunshine Cleaning call by SunnyBee AI. This schema is used in VAPI's analysis.structuredData configuration.",
+  "description": "Data extracted from a Sunshine Cleaning call by SunnyBee. Used in VAPI's analysis.structuredData configuration. v2.0 — supports full property, per-room, and commercial quotes.",
   "type": "object",
   "properties": {
     "firstName": {
@@ -13,7 +13,7 @@
     },
     "address": {
       "type": "string",
-      "description": "Property street address"
+      "description": "Full property street address"
     },
     "city": {
       "type": "string",
@@ -21,20 +21,21 @@
     },
     "state": {
       "type": "string",
-      "description": "Property state abbreviation (GA, FL, TX, NY, MA)"
+      "enum": ["GA", "FL", "TX", "NY", "MA"],
+      "description": "Property state abbreviation"
     },
     "zipCode": {
       "type": "string",
-      "description": "Property zip code"
+      "description": "Property ZIP code"
     },
     "propertyType": {
       "type": "string",
-      "enum": ["house", "apartment", "condo", "office"],
+      "enum": ["house", "apartment", "condo", "office", "commercial"],
       "description": "Type of property to be cleaned"
     },
     "bedrooms": {
       "type": "integer",
-      "description": "Number of bedrooms"
+      "description": "Number of bedrooms (residential only)"
     },
     "bathrooms": {
       "type": "integer",
@@ -44,19 +45,50 @@
       "type": "integer",
       "description": "Approximate square footage of the property"
     },
+    "offices": {
+      "type": "integer",
+      "description": "Number of offices (commercial only)"
+    },
+    "commonAreas": {
+      "type": "integer",
+      "description": "Number of common areas (commercial only)"
+    },
     "isOccupied": {
       "type": "boolean",
       "description": "Whether the property is currently occupied"
     },
     "conditionLevel": {
       "type": "string",
-      "enum": ["light", "moderate", "heavy"],
-      "description": "Current cleanliness condition: light (routine), moderate (visible dirt), heavy (strong buildup)"
+      "enum": ["light", "moderate", "restoration"],
+      "description": "Current condition: light (routine), moderate (visible buildup), restoration (heavy buildup)"
     },
     "serviceType": {
       "type": "string",
-      "enum": ["standard_cleaning", "deep_cleaning", "recurring", "move_in", "move_out", "post_construction"],
+      "enum": ["regular_clean", "deep_clean", "move_in", "move_out", "partial_clean"],
       "description": "Type of cleaning service requested"
+    },
+    "quoteType": {
+      "type": "string",
+      "enum": ["full_property", "per_room", "commercial"],
+      "description": "How the quote was calculated"
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["Bathroom", "Kitchen", "Bedroom", "Living Room", "Office", "Common Area"],
+            "description": "Room type"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Number of this room type"
+          }
+        }
+      },
+      "description": "Specific rooms requested for partial/per-room cleaning"
     },
     "frequency": {
       "type": "string",
@@ -66,16 +98,27 @@
     "addOns": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Additional areas/services requested: inside_oven, inside_fridge, inside_cabinets, baseboards, blinds, walls, garage, laundry, pet_hair, organization"
+      "description": "Additional services: inside_oven, inside_fridge, inside_cabinets, baseboards, blinds, walls, garage, laundry, pet_hair"
     },
     "preferredSchedule": {
       "type": "string",
-      "description": "Preferred days and time of day (e.g., 'weekday mornings', 'Saturday afternoon')"
+      "description": "Preferred days and time (e.g., 'weekday mornings', 'Saturday afternoon')"
     },
-    "language": {
-      "type": "string",
-      "enum": ["en", "es"],
-      "description": "Language the caller spoke during the call"
+    "quotedPrice": {
+      "type": "number",
+      "description": "Price quoted during the call via get_cleaning_quote tool (in dollars)"
+    },
+    "quotedPriceExact": {
+      "type": "boolean",
+      "description": "Whether the quoted price was an exact match from the pricing matrix"
+    },
+    "depositRequired": {
+      "type": "boolean",
+      "description": "Whether a deposit was required (true for Deep Cleans)"
+    },
+    "depositAmount": {
+      "type": "number",
+      "description": "Deposit amount in dollars (typically 150)"
     },
     "contactPreference": {
       "type": "string",
@@ -84,12 +127,20 @@
     },
     "outcome": {
       "type": "string",
-      "enum": ["interested", "scheduled", "deposit_requested", "callback", "not_interested", "voicemail"],
-      "description": "Call outcome based on the conversation"
+      "enum": ["booked", "interested", "callback", "not_interested", "voicemail", "out_of_area"],
+      "description": "Call outcome: booked (date locked), interested (wants quote/follow-up), callback (call back later), not_interested, voicemail, out_of_area"
+    },
+    "scheduledDate": {
+      "type": "string",
+      "description": "Scheduled service date if booked (ISO format or natural language)"
+    },
+    "scheduledTime": {
+      "type": "string",
+      "description": "Scheduled service time if booked"
     },
     "notes": {
       "type": "string",
-      "description": "Any additional notes or special requests mentioned by the caller"
+      "description": "Any additional notes, special requests, or objections mentioned"
     }
   },
   "required": ["firstName", "outcome"]

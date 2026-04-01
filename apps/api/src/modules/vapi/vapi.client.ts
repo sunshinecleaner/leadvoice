@@ -71,21 +71,17 @@ export async function getAssistant(assistantId: string) {
 }
 
 // Create assistant
-export async function createAssistant(params: {
-  name: string;
-  firstMessage: string;
-  model: {
-    provider: string;
-    model: string;
-    systemPrompt: string;
-  };
-  voice?: {
-    provider: string;
-    voiceId: string;
-  };
-}) {
+export async function createAssistant(params: Record<string, unknown>) {
   return vapiRequest<VapiAssistant>("/assistant", {
     method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+// Update assistant
+export async function updateAssistant(assistantId: string, params: Record<string, unknown>) {
+  return vapiRequest<VapiAssistant>(`/assistant/${assistantId}`, {
+    method: "PATCH",
     body: JSON.stringify(params),
   });
 }

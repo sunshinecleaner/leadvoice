@@ -1,0 +1,13 @@
+State,Service,Sqft Min,Sqft Max,Price
+GA,Regular Clean,0,500,150
+GA,Regular Clean,501,1000,200
+GA,Regular Clean,1001,1500,300
+GA,Regular Clean,1501,2000,350
+GA,Regular Clean,2001,3000,450
+GA,Regular Clean,3001,5000,550
+GA,Deep Clean,0,500,250
+GA,Deep Clean,501,1000,350
+GA,Deep Clean,1001,1500,480
+GA,Deep Clean,1501,2000,550
+GA,Deep Clean,2001,3000,700
+GA,Deep Clean,3001,5000,850

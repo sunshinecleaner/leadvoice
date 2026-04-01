@@ -3,7 +3,7 @@
 
   "name": "SunnyBee",
 
-  "firstMessage": "Hello, thank you for calling Sunshine Cleaning. This is SunnyBee, your virtual assistant. I'm here to help you with scheduling and service information. How can I assist you today?",
+  "firstMessage": "Hello, thank you for calling Sunshine Cleaning! This is SunnyBee. How can I help you today?",
 
   "model": {
     "provider": "openai",
@@ -28,11 +28,11 @@
   "recordingEnabled": true,
   "silenceTimeoutSeconds": 30,
   "maxDurationSeconds": 600,
-  "endCallMessage": "Thank you for contacting Sunshine Cleaning. You'll receive a text message shortly with the next steps. Have a wonderful day!",
+  "endCallMessage": "Thank you for choosing Sunshine Cleaning. You'll receive a text shortly with all the details. Have a wonderful day!",
   "endCallPhrases": ["goodbye", "have a nice day", "no thank you", "not interested", "adios", "gracias"],
 
   "metadata": {
     "company": "Sunshine WL Brazilian",
-    "version": "1.0"
+    "version": "2.0"
   }
 }

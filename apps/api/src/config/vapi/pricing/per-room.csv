@@ -1,0 +1,13 @@
+State,Service,Room Type,Price
+GA,Regular Clean,Bathroom,50
+GA,Regular Clean,Kitchen,60
+GA,Regular Clean,Bedroom,45
+GA,Regular Clean,Living Room,55
+GA,Regular Clean,Office,55
+GA,Regular Clean,Common Area,50
+GA,Deep Clean,Bathroom,85
+GA,Deep Clean,Kitchen,95
+GA,Deep Clean,Bedroom,70
+GA,Deep Clean,Living Room,80
+GA,Deep Clean,Office,80
+GA,Deep Clean,Common Area,75

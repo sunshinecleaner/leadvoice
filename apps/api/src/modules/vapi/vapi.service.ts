@@ -183,6 +183,17 @@ export async function processCallCompleted(
     await createServiceRequest(call.leadId, structured);
   }
 
+  // Store quoted price if provided during the call
+  if (structured.quotedPrice) {
+    await (prisma as any).serviceRequest.updateMany({
+      where: { leadId: call.leadId },
+      data: {
+        quotedPrice: Number(structured.quotedPrice),
+        quotedPriceExact: structured.quotedPriceExact !== false,
+      },
+    });
+  }
+
   if (call.campaignLeadId) {
     await prisma.campaignLead.update({
       where: { id: call.campaignLeadId },
@@ -208,7 +219,7 @@ export async function processCallCompleted(
   await triggerN8N("call_completed", n8nPayload);
 
   // Send automatic SMS based on call outcome
-  const smsOutcomes = ["INTERESTED", "SCHEDULED", "DEPOSIT_REQUESTED", "VOICEMAIL"];
+  const smsOutcomes = ["INTERESTED", "BOOKED", "SCHEDULED", "DEPOSIT_REQUESTED", "VOICEMAIL"];
   if (smsOutcomes.includes(outcome)) {
     await sendAutoSmsToLead(call.leadId, outcome, structured);
     await triggerN8NSms(n8nPayload);
@@ -246,11 +257,12 @@ async function updateLeadFromStructuredData(
       ...(data.isOccupied !== undefined && data.isOccupied !== null ? { isOccupied: Boolean(data.isOccupied) } : {}),
       ...(has(data.conditionLevel) ? { conditionLevel: mapConditionLevel(String(data.conditionLevel)) } : {}),
       ...(has(data.preferredSchedule) ? { preferredSchedule: String(data.preferredSchedule) } : {}),
-      ...(has(data.language) ? { language: String(data.language).toUpperCase() === "ES" ? "ES" : "EN" } : {}),
+      ...(has(data.scheduledDate) ? { preferredSchedule: `${String(data.scheduledDate)} ${String(data.scheduledTime || "")}`.trim() } : {}),
+      language: "EN",
       status:
-        outcome === "INTERESTED" || outcome === "SCHEDULED"
+        outcome === "BOOKED" || outcome === "INTERESTED"
           ? LeadStatus.QUALIFIED
-          : outcome === "NOT_INTERESTED"
+          : outcome === "NOT_INTERESTED" || outcome === "OUT_OF_AREA"
           ? LeadStatus.LOST
           : LeadStatus.CONTACTED,
       crmStage,
@@ -415,29 +427,39 @@ async function extractStructuredDataWithAI(
 Fields to extract:
 - firstName (string | null): caller's first name
 - lastName (string | null): caller's last name
-- address (string | null): property street address
+- address (string | null): full property street address
 - city (string | null): property city
 - state (string | null): state abbreviation (GA, TX, MA, FL, NY)
 - zipCode (string | null): zip code
-- propertyType (string | null): house, apartment, condo, or office
-- bedrooms (integer | null): number of bedrooms
+- propertyType (string | null): house, apartment, condo, office, or commercial
+- bedrooms (integer | null): number of bedrooms (residential)
 - bathrooms (integer | null): number of bathrooms
+- offices (integer | null): number of offices (commercial)
+- commonAreas (integer | null): number of common areas (commercial)
 - sqft (integer | null): approximate square footage
 - isOccupied (boolean | null): whether property is occupied
-- conditionLevel (string | null): light, moderate, or heavy
-- serviceType (string | null): standard_cleaning, deep_cleaning, recurring, move_in, move_out, or post_construction
+- conditionLevel (string | null): light, moderate, or restoration
+- serviceType (string | null): regular_clean, deep_clean, move_in, move_out, or partial_clean
+- quoteType (string | null): full_property, per_room, or commercial
+- rooms (array | null): for partial cleans — [{ type: "Bathroom"|"Kitchen"|"Bedroom"|"Living Room"|"Office"|"Common Area", quantity: number }]
 - frequency (string | null): one_time, weekly, bi_weekly, or monthly
+- addOns (array | null): extra services requested (inside_oven, inside_fridge, inside_cabinets, baseboards, blinds, walls, pet_hair)
 - preferredSchedule (string | null): preferred days/time
-- outcome (string): interested, scheduled, deposit_requested, callback, not_interested, or voicemail
-- notes (string | null): any additional notes or special requests
-- summary (string): A clean, concise 2-3 sentence summary of the call. Include: caller name, property details (type, beds/baths, location), service requested, condition level, and outcome. Write in third person, professional tone. Example: "John Smith called about a 3-bed/2-bath house in Atlanta, GA (ZIP 30301). Requested a standard cleaning, property is lightly maintained. Appointment scheduled for Monday at 10 AM."
+- quotedPrice (number | null): price quoted during the call (in dollars)
+- depositRequired (boolean | null): whether a deposit was required
+- outcome (string): booked, interested, callback, not_interested, voicemail, or out_of_area
+- scheduledDate (string | null): scheduled service date if booked
+- scheduledTime (string | null): scheduled service time if booked
+- notes (string | null): any additional notes, special requests, or objections
+- summary (string): A clean, concise 2-3 sentence summary of the call. Include: caller name, property details (type, beds/baths, location), service requested, condition level, price quoted, and outcome. Write in third person, professional tone. Example: "John Smith called about a 3-bed/2-bath house in Atlanta, GA (ZIP 30301). Quoted $380 for a deep cleaning, property has moderate buildup. Appointment booked for Monday at 10 AM, $150 deposit required."
 
 IMPORTANT RULES:
 1. If the caller did NOT provide their name, set firstName and lastName to null (not "").
 2. Use the EXACT numbers the caller stated (don't change 2 bedrooms to 3).
-3. For outcome: "interested" if caller engaged and provided property details. "not_interested" if they declined or hung up quickly. "voicemail" if no live conversation.
+3. For outcome: "booked" if a date was locked in. "interested" if caller engaged but didn't book. "not_interested" if they declined. "voicemail" if no live conversation. "out_of_area" if outside service area.
 4. Always include the outcome and summary fields — they are required.
-5. The summary field must be a clean, human-readable text (no markdown, no bullets, no asterisks).`,
+5. The summary field must be a clean, human-readable text (no markdown, no bullets, no asterisks).
+6. If a price was quoted during the call, always include quotedPrice.`,
           },
           { role: "user", content: text },
         ],
@@ -469,19 +491,21 @@ function mapVapiOutcome(
 ): string {
   if (structured?.outcome) {
     const o = String(structured.outcome).toLowerCase();
+    if (o === "booked") return "BOOKED";
     if (o === "scheduled") return "SCHEDULED";
     if (o === "deposit_requested") return "DEPOSIT_REQUESTED";
     if (o === "callback") return "CALLBACK";
     if (o === "not_interested") return "NOT_INTERESTED";
     if (o === "voicemail") return "VOICEMAIL";
     if (o === "interested") return "INTERESTED";
+    if (o === "out_of_area") return "OUT_OF_AREA";
   }
 
   if (!evaluation) return "ERROR";
   const lower = evaluation.toLowerCase();
   if (lower === "true") return "INTERESTED";
   if (lower === "false") return "NOT_INTERESTED";
-  if (lower.includes("scheduled")) return "SCHEDULED";
+  if (lower.includes("booked") || lower.includes("scheduled")) return "BOOKED";
   if (lower.includes("success") || lower.includes("interested")) return "INTERESTED";
   if (lower.includes("callback") || lower.includes("later")) return "CALLBACK";
   if (lower.includes("transfer")) return "TRANSFERRED";
@@ -490,15 +514,17 @@ function mapVapiOutcome(
 }
 
 function mapOutcomeToCrmStage(outcome: string, structured: Record<string, unknown>): string {
-  // CRM Funnel: Lead Novo → Sem Telefone → Qualificado → Checklist Enviado → Agendado → Em Execução → Finalizado → Pgto Pendente → Pós-Serviço
   const hasFullDetails = structured.propertyType && (structured.bedrooms || structured.sqft);
+  const hasPrice = !!structured.quotedPrice;
 
-  if (outcome === "SCHEDULED") return "SCHEDULED";
+  if (outcome === "BOOKED" || outcome === "SCHEDULED") return "SCHEDULED";
   if (outcome === "DEPOSIT_REQUESTED") return "CHECKLIST_SENT";
+  if ((outcome === "INTERESTED") && hasPrice) return "CHECKLIST_SENT";
   if (outcome === "INTERESTED" && hasFullDetails) return "LEAD_QUALIFIED";
-  if (outcome === "INTERESTED") return "LEAD_NEW"; // Interested but missing details
+  if (outcome === "INTERESTED") return "LEAD_NEW";
   if (outcome === "CALLBACK") return "LEAD_NEW";
   if (outcome === "VOICEMAIL") return "LEAD_NEW";
+  if (outcome === "OUT_OF_AREA") return "LEAD_NEW";
   return "LEAD_NEW";
 }
 
@@ -557,6 +583,7 @@ function mapConditionLevel(value: string): string | undefined {
     light: "LIGHT",
     moderate: "MODERATE",
     heavy: "HEAVY",
+    restoration: "HEAVY",
   };
   return map[value.toLowerCase()];
 }
@@ -564,7 +591,8 @@ function mapConditionLevel(value: string): string | undefined {
 function mapServiceType(value: string): string | undefined {
   const lower = value.toLowerCase();
   if (lower.includes("deep")) return "DEEP_CLEANING";
-  if (lower.includes("standard")) return "STANDARD_CLEANING";
+  if (lower.includes("regular") || lower.includes("standard")) return "STANDARD_CLEANING";
+  if (lower.includes("partial") || lower.includes("per_room") || lower.includes("per-room")) return "STANDARD_CLEANING";
   if (lower.includes("recurring")) return "RECURRING";
   if (lower.includes("move_in") || lower.includes("move-in")) return "MOVE_IN";
   if (lower.includes("move_out") || lower.includes("move-out")) return "MOVE_OUT";
