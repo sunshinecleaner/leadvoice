@@ -59,8 +59,8 @@
     },
     "conditionLevel": {
       "type": "string",
-      "enum": ["light", "moderate", "restoration"],
-      "description": "Current condition: light (routine), moderate (visible buildup), restoration (heavy buildup)"
+      "enum": ["light", "moderate", "heavy", "restoration"],
+      "description": "Current condition: light (routine maintenance), moderate (visible buildup), heavy or restoration (strong buildup, stains, grease)"
     },
     "serviceType": {
       "type": "string",
@@ -127,8 +127,8 @@
     },
     "outcome": {
       "type": "string",
-      "enum": ["booked", "interested", "callback", "not_interested", "voicemail", "out_of_area"],
-      "description": "Call outcome: booked (date locked), interested (wants quote/follow-up), callback (call back later), not_interested, voicemail, out_of_area"
+      "enum": ["booked", "deposit_requested", "interested", "callback", "not_interested", "voicemail", "out_of_area"],
+      "description": "Call outcome: booked (date locked), deposit_requested (deep clean deposit discussed and accepted), interested (wants quote/follow-up), callback (call back later), not_interested, voicemail, out_of_area"
     },
     "scheduledDate": {
       "type": "string",

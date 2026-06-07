@@ -122,15 +122,15 @@ export async function vapiToolsRoutes(app: FastifyInstance) {
     return reply.status(400).send({ success: false, error: "Missing zip_code" });
   });
 
-  // ─── Tool: get_cleaning_quote (n8n → Google Sheets price lookup) ───────────
+  // ─── Tool: get_cleaning_quote (DB price lookup) ────────────────────────────
   app.post("/get-cleaning-quote", async (request, reply) => {
     const toolCall = extractToolArgs(request.body);
 
     if (toolCall) {
       const { args } = toolCall;
-      logger.info({ args }, "VAPI tool: get_cleaning_quote — requesting price from n8n");
+      logger.info({ args }, "VAPI tool: get_cleaning_quote — querying DB");
 
-      const price = await fetchQuoteFromN8N(args);
+      const price = await fetchQuoteFromDB(args);
 
       return reply.send({
         results: [{
@@ -142,8 +142,8 @@ export async function vapiToolsRoutes(app: FastifyInstance) {
 
     // Fallback: direct API call (for testing)
     const directBody = request.body as Record<string, unknown>;
-    if (directBody?.quote_type) {
-      const price = await fetchQuoteFromN8N(directBody);
+    if (directBody?.bedrooms !== undefined || directBody?.service_type) {
+      const price = await fetchQuoteFromDB(directBody);
       return reply.send({ success: true, data: price });
     }
 
@@ -181,57 +181,58 @@ export async function vapiToolsRoutes(app: FastifyInstance) {
   });
 }
 
-// ─── n8n Price Lookup ────────────────────────────────────────────────────────
+// ─── DB Price Lookup ──────────────────────────────────────────────────────────
 
-async function fetchQuoteFromN8N(
+type PricingServiceType = "DEEP_CLEAN" | "MONTHLY" | "BIWEEKLY" | "WEEKLY";
+type PricingClassification = "EASY" | "MEDIUM" | "HARD";
+
+function resolveServiceType(serviceType: unknown): PricingServiceType {
+  const s = String(serviceType || "").toLowerCase();
+  if (s.includes("deep") || s.includes("move") || s.includes("construction") || s.includes("standard")) return "DEEP_CLEAN";
+  if (s.includes("weekly") && !s.includes("bi")) return "WEEKLY";
+  if (s.includes("biweekly") || s.includes("bi_weekly") || s.includes("bi-weekly")) return "BIWEEKLY";
+  if (s.includes("monthly")) return "MONTHLY";
+  return "DEEP_CLEAN";
+}
+
+function resolveClassification(totalRooms: number): PricingClassification {
+  if (totalRooms <= 3) return "EASY";
+  if (totalRooms <= 6) return "MEDIUM";
+  return "HARD";
+}
+
+async function fetchQuoteFromDB(
   params: Record<string, unknown>,
-): Promise<{ price: number | null; exact_match: boolean; error?: string }> {
-  const webhookUrl = env.N8N_QUOTE_WEBHOOK_URL;
-
-  if (!webhookUrl) {
-    logger.warn("N8N_QUOTE_WEBHOOK_URL not set — cannot fetch quote");
-    return { price: null, exact_match: false, error: "Pricing system unavailable. A manager will follow up with the exact quote." };
-  }
-
+): Promise<{ price: number | null; exact_match: boolean; formatted?: string; error?: string }> {
   try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        quote_type: params.quote_type,
-        state: params.state,
-        service: params.service,
-        // Full property
-        bedrooms: params.bedrooms,
-        bathrooms: params.bathrooms,
-        // Per-room
-        rooms: params.rooms,
-        // Commercial
-        offices: params.offices,
-        common_areas: params.common_areas,
-        sqft: params.sqft,
-      }),
+    const bedrooms = Number(params.bedrooms) || 0;
+    const bathrooms = Number(params.bathrooms) || 0;
+    const totalRooms = bedrooms + bathrooms;
+
+    if (totalRooms === 0) {
+      return { price: null, exact_match: false, error: "Please provide the number of bedrooms and bathrooms to get a quote." };
+    }
+
+    const serviceType = resolveServiceType(params.service_type);
+    const classification = resolveClassification(totalRooms);
+
+    const rate = await prisma.pricingRate.findUnique({
+      where: { serviceType_classification: { serviceType, classification } },
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      logger.error({ status: res.status, response: text.slice(0, 500) }, "n8n quote webhook error");
-      return { price: null, exact_match: false, error: "Unable to retrieve pricing at this time." };
+    if (!rate || !rate.active) {
+      logger.warn({ serviceType, classification }, "No pricing rate found in DB");
+      return { price: null, exact_match: false, error: "Pricing not available for this service. A manager will follow up." };
     }
 
-    const data = await res.json() as { price?: number; exact_match?: boolean };
-    logger.info({ params, result: data }, "n8n quote response");
+    const price = Math.round(totalRooms * rate.pricePerRoom * 1.18 * 100) / 100;
+    const formatted = `$${price.toFixed(2)}`;
 
-    if (data.price === undefined || data.price === null) {
-      return { price: null, exact_match: false, error: "No matching price found for these specifications." };
-    }
+    logger.info({ serviceType, classification, totalRooms, pricePerRoom: rate.pricePerRoom, price }, "Quote from DB");
 
-    return {
-      price: data.price,
-      exact_match: data.exact_match !== false,
-    };
+    return { price, exact_match: true, formatted };
   } catch (error) {
-    logger.error({ error }, "Failed to fetch quote from n8n");
+    logger.error({ error }, "Failed to fetch quote from DB");
     return { price: null, exact_match: false, error: "Pricing system temporarily unavailable." };
   }
 }

@@ -428,3 +428,31 @@ model Setting {
 
   @@map("settings")
 }
+
+// ─── Pricing ──────────────────────────────────────────────────────────────────
+
+enum PricingServiceType {
+  DEEP_CLEAN
+  MONTHLY
+  BIWEEKLY
+  WEEKLY
+}
+
+enum PricingClassification {
+  EASY    // 2-3 rooms
+  MEDIUM  // 4-6 rooms
+  HARD    // 7+ rooms
+}
+
+model PricingRate {
+  id             String                @id @default(cuid())
+  serviceType    PricingServiceType
+  classification PricingClassification
+  pricePerRoom   Float
+  active         Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([serviceType, classification])
+  @@map("pricing_rates")
+}

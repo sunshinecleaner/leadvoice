@@ -44,7 +44,7 @@ const assistantConfig = {
 
   model: {
     provider: "openai",
-    model: "gpt-4o",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -78,7 +78,7 @@ const assistantConfig = {
         function: {
           name: "get_cleaning_quote",
           description:
-            "Retrieves the real-time price from the pricing matrix via n8n + Google Sheets. Call this AFTER collecting all property details and AFTER sending the checklist. Returns { price, exact_match }.",
+            "Retrieves the real-time price from the pricing matrix via n8n + Google Sheets. Call this after collecting the minimum required details (state + what they want cleaned + service type). For quick price requests, call immediately. For full bookings, call after sending the checklist. Returns { price, exact_match }.",
           parameters: {
             type: "object",
             properties: {
@@ -179,8 +179,11 @@ const assistantConfig = {
   },
 
   voice: {
-    provider: "openai",
-    voiceId: "shimmer",
+    provider: "11labs",
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    model: "eleven_turbo_v2_5",
+    stability: 0.4,
+    similarityBoost: 0.75,
   },
 
   serverUrl: SERVER_URL,
@@ -224,7 +227,7 @@ const assistantConfig = {
         {
           role: "system",
           content:
-            "Extract structured data from the call transcript. Only include fields that were explicitly mentioned. For outcome: 'booked' if a date was locked in, 'interested' if engaged and wants quote/follow-up, 'callback' if wants to be called back, 'not_interested' if declined, 'voicemail' if no live conversation, 'out_of_area' if outside service area. Always include quotedPrice if a price was stated during the call.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON.",
+            "Extract structured data from the call transcript. Only include fields that were explicitly mentioned. For outcome: 'booked' if a date was locked in, 'interested' if engaged and wants quote/follow-up, 'callback' if wants to be called back, 'not_interested' if declined, 'voicemail' if no live conversation, 'out_of_area' if outside service area, 'deposit_requested' if a deep clean deposit was discussed and the caller agreed to pay. Always include quotedPrice if a price was stated during the call.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON.",
         },
         {
           role: "user",

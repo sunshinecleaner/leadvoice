@@ -14,6 +14,7 @@ import {
   LogOut,
   CalendarDays,
   HelpCircle,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -29,15 +30,16 @@ const menuItems = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-const generalItems = [
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/help", label: "Help", icon: HelpCircle },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+
+  const generalItems = [
+    { href: "/settings", label: "Settings", icon: Settings },
+    ...(user?.role === "ADMIN" ? [{ href: "/settings/pricing", label: "Pricing", icon: DollarSign }] : []),
+    { href: "/help", label: "Help", icon: HelpCircle },
+  ];
 
   const handleLogout = () => {
     logout();

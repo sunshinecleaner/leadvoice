@@ -80,7 +80,7 @@
     },
     {
       "parameters": {
-        "sendTo": "vpswelica@paviani.net",
+        "sendTo": "sunshineautomacoes@gmail.com",
         "subject": "={{ $json.subject }}",
         "emailType": "html",
         "html": "={{ $json.html }}",
