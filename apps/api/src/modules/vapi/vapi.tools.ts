@@ -187,11 +187,12 @@ type PricingServiceType = "DEEP_CLEAN" | "MONTHLY" | "BIWEEKLY" | "WEEKLY";
 type PricingClassification = "EASY" | "MEDIUM" | "HARD";
 
 function resolveServiceType(serviceType: unknown): PricingServiceType {
-  const s = String(serviceType || "").toLowerCase();
-  if (s.includes("deep") || s.includes("move") || s.includes("construction") || s.includes("standard")) return "DEEP_CLEAN";
-  if (s.includes("weekly") && !s.includes("bi")) return "WEEKLY";
-  if (s.includes("biweekly") || s.includes("bi_weekly") || s.includes("bi-weekly")) return "BIWEEKLY";
-  if (s.includes("monthly")) return "MONTHLY";
+  // accepts both new (service_type) and legacy (service) param names and values
+  const s = String(serviceType || "").toLowerCase().replace(/[\s-]/g, "_");
+  if (s.includes("deep") || s.includes("move") || s.includes("construction") || s.includes("standard") || s.includes("one_time")) return "DEEP_CLEAN";
+  if (s.includes("bi") || s.includes("quinzenal") || s.includes("biweekly")) return "BIWEEKLY";
+  if (s.includes("week") || s.includes("semanal")) return "WEEKLY";
+  if (s.includes("month") || s.includes("mensal") || s.includes("recurring") || s.includes("regular")) return "MONTHLY";
   return "DEEP_CLEAN";
 }
 
@@ -213,7 +214,7 @@ async function fetchQuoteFromDB(
       return { price: null, exact_match: false, error: "Please provide the number of bedrooms and bathrooms to get a quote." };
     }
 
-    const serviceType = resolveServiceType(params.service_type);
+    const serviceType = resolveServiceType(params.service_type ?? params.service ?? params.frequency);
     const classification = resolveClassification(totalRooms);
 
     const rate = await prisma.pricingRate.findUnique({

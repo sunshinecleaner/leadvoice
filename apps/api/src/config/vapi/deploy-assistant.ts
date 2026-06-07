@@ -78,70 +78,26 @@ const assistantConfig = {
         function: {
           name: "get_cleaning_quote",
           description:
-            "Retrieves the real-time price from the pricing matrix via n8n + Google Sheets. Call this after collecting the minimum required details (state + what they want cleaned + service type). For quick price requests, call immediately. For full bookings, call after sending the checklist. Returns { price, exact_match }.",
+            "Calculates the cleaning price in real time from the pricing database. Call this after knowing: service type, number of bedrooms, and number of bathrooms. Returns { price, formatted, exact_match }.",
           parameters: {
             type: "object",
             properties: {
-              quote_type: {
+              service_type: {
                 type: "string",
-                enum: ["full_property", "per_room", "commercial"],
+                enum: ["deep_clean", "monthly", "biweekly", "weekly"],
                 description:
-                  "full_property = residential whole home, per_room = specific rooms only, commercial = office/commercial space",
-              },
-              state: {
-                type: "string",
-                enum: ["GA", "FL", "TX", "NY", "MA"],
-                description: "State abbreviation",
-              },
-              service: {
-                type: "string",
-                enum: ["Regular Clean", "Deep Clean", "Move In", "Move Out"],
-                description: "Type of cleaning service",
+                  "Type of cleaning service: deep_clean (one-time deep clean, move-in, move-out), monthly (once a month recurring), biweekly (every two weeks), weekly (every week)",
               },
               bedrooms: {
                 type: "integer",
-                description: "Number of bedrooms (full_property only)",
+                description: "Number of bedrooms",
               },
               bathrooms: {
                 type: "integer",
-                description: "Number of bathrooms (full_property only)",
-              },
-              rooms: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    type: {
-                      type: "string",
-                      enum: [
-                        "Bathroom",
-                        "Kitchen",
-                        "Bedroom",
-                        "Living Room",
-                        "Office",
-                        "Common Area",
-                      ],
-                    },
-                    quantity: { type: "integer" },
-                  },
-                  required: ["type", "quantity"],
-                },
-                description: "Rooms to clean (per_room only)",
-              },
-              offices: {
-                type: "integer",
-                description: "Number of offices (commercial only)",
-              },
-              common_areas: {
-                type: "integer",
-                description: "Number of common areas (commercial only)",
-              },
-              sqft: {
-                type: "integer",
-                description: "Square footage (commercial only)",
+                description: "Number of bathrooms",
               },
             },
-            required: ["quote_type", "state", "service"],
+            required: ["service_type", "bedrooms", "bathrooms"],
           },
         },
         server: {
