@@ -263,6 +263,10 @@ model ServiceRequest {
   googleCalendarEventId String?
   googleCalendarLink    String?
 
+  // Team assignment
+  teamMemberId  String?
+  teamMember    TeamMember? @relation(fields: [teamMemberId], references: [id], onDelete: SetNull)
+
   // Pricing
   estimatedAmount Float?
   totalAmount     Float?
@@ -281,6 +285,7 @@ model ServiceRequest {
   @@index([leadId])
   @@index([serviceType])
   @@index([paymentStatus])
+  @@index([teamMemberId])
   @@map("service_requests")
 }
 
@@ -427,6 +432,50 @@ model Setting {
   type  String @default("string")
 
   @@map("settings")
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+
+model TeamMember {
+  id               String    @id @default(cuid())
+  name             String
+  phone            String?
+  email            String?
+  address          String?
+  birthDate        DateTime?
+  emergencyContact String?
+  costPerClean     Float?
+  active           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  serviceRequests ServiceRequest[]
+
+  @@map("team_members")
+}
+
+// ─── Cash Flow ────────────────────────────────────────────────────────────────
+
+enum CashFlowType {
+  INCOME
+  EXPENSE
+}
+
+model CashFlow {
+  id            String       @id @default(cuid())
+  date          DateTime
+  description   String
+  category      String
+  amount        Float
+  type          CashFlowType
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([date])
+  @@index([type])
+  @@map("cash_flows")
 }
 
 // ─── Pricing ──────────────────────────────────────────────────────────────────

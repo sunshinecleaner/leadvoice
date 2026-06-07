@@ -15,6 +15,10 @@ import {
   CalendarDays,
   HelpCircle,
   DollarSign,
+  Users2,
+  HardHat,
+  Receipt,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -23,11 +27,15 @@ import { useRouter } from "next/navigation";
 const menuItems = [
   { href: "/overview", label: "Dashboard", icon: LayoutDashboard },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/clients", label: "Clients", icon: Users2 },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/calls", label: "Calls", icon: Phone },
   { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/team", label: "Team", icon: HardHat },
+  { href: "/cashflow", label: "Cash Flow", icon: Receipt },
+  { href: "/billing", label: "Billing", icon: TrendingUp },
 ];
 
 export function Sidebar() {

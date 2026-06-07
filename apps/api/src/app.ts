@@ -17,6 +17,9 @@ import { smsRoutes } from "./modules/sms/sms.routes.js";
 import { callsRoutes } from "./modules/calls/calls.routes.js";
 import { googleCalendarRoutes } from "./modules/google-calendar/google-calendar.routes.js";
 import { pricingRoutes } from "./modules/pricing/pricing.routes.js";
+import { teamRoutes } from "./modules/team/team.routes.js";
+import { cashflowRoutes } from "./modules/cashflow/cashflow.routes.js";
+import { clientsRoutes } from "./modules/clients/clients.routes.js";
 import formbody from "@fastify/formbody";
 
 export async function buildApp() {
@@ -96,6 +99,9 @@ export async function buildApp() {
   await app.register(callsRoutes, { prefix: "/api/calls" });
   await app.register(googleCalendarRoutes, { prefix: "/api/google-calendar" });
   await app.register(pricingRoutes, { prefix: "/api/pricing" });
+  await app.register(teamRoutes, { prefix: "/api/team" });
+  await app.register(cashflowRoutes, { prefix: "/api/cashflow" });
+  await app.register(clientsRoutes, { prefix: "/api/clients" });
 
   return app;
 }
